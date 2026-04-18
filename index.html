@@ -36,13 +36,12 @@
 <body class="bg-[#F8FAFC]">
     <div id="root"></div>
 
-    <!-- Firebase SDK를 모듈 타입으로 먼저 로드 -->
+    <!-- Firebase SDK 로드 -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getFirestore, collection, doc, setDoc, onSnapshot, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-        // 전역 객체에 Firebase 함수 노출 (Babel 스크립트에서 접근 가능하도록)
         window.FirebaseUtils = {
             initializeApp, getFirestore, collection, doc, setDoc, onSnapshot, addDoc, deleteDoc,
             getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken
@@ -51,30 +50,26 @@
 
     <script type="text/babel">
         const { useState, useMemo, useEffect } = React;
-        
-        // 전역으로 노출된 Firebase 함수 가져오기
         const { 
             initializeApp, getFirestore, collection, doc, setDoc, onSnapshot, addDoc, deleteDoc,
             getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken 
         } = window.FirebaseUtils;
 
-        // --- 환경 설정 ---
-        // window.__firebase_config가 정의되어 있지 않을 경우를 대비한 기본값 (실제 배포시 수동 입력 필요)
-        const firebaseConfig = window.__firebase_config ? JSON.parse(window.__firebase_config) : {
-            apiKey: "",
+        // --- 환경 설정 (이곳에 실제 Firebase 키 값을 입력하세요) ---
+        const firebaseConfig = {
+            apiKey: "실제_API_KEY_입력",
             authDomain: "mollib-math.firebaseapp.com",
             projectId: "mollib-math",
             storageBucket: "mollib-math.appspot.com",
-            messagingSenderId: "",
-            appId: ""
+            messagingSenderId: "실제_발신자_ID_입력",
+            appId: "실제_APP_ID_입력"
         };
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'mollib-math-elementary';
+        const appId = 'mollib-math-elementary'; 
 
-        // Lucide 아이콘 컴포넌트 래퍼
         const Icon = ({ name, size = 24, className = "" }) => {
             useEffect(() => { 
                 if (window.lucide) window.lucide.createIcons(); 
@@ -84,38 +79,41 @@
 
         const App = () => {
             const [user, setUser] = useState(null);
+            const [authError, setAuthError] = useState(null);
             const [viewMode, setViewMode] = useState('attendance'); 
             const [activeClassId, setActiveClassId] = useState(null);
             const [targetDate, setTargetDate] = useState(new Date().toISOString().split('T')[0]);
             const [students, setStudents] = useState([]);
             const [attendanceLogs, setAttendanceLogs] = useState([]);
             const [isDbLoaded, setIsDbLoaded] = useState(false);
-            const [reportSearchTerm, setReportSearchTerm] = useState('');
             const [showAddModal, setShowAddModal] = useState(false);
             const [showDeleteConfirm, setShowDeleteConfirm] = useState(null); 
             const [modalTargetClass, setModalTargetClass] = useState(null);
             const [newStudentName, setNewStudentName] = useState('');
             const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-            // 1. 인증 처리
+            // 지수 백오프를 이용한 익명 로그인 재시도 로직
             useEffect(() => {
-                const initAuth = async () => {
+                const signInWithRetry = async (retryCount = 0) => {
                     try {
-                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                            await signInWithCustomToken(auth, __initial_auth_token);
-                        } else {
-                            await signInAnonymously(auth);
-                        }
+                        await signInAnonymously(auth);
+                        setAuthError(null);
                     } catch (err) {
-                        console.error("Auth Error:", err);
+                        if (retryCount < 5) {
+                            const delay = Math.pow(2, retryCount) * 1000;
+                            setTimeout(() => signInWithRetry(retryCount + 1), delay);
+                        } else {
+                            console.error("최종 인증 실패:", err);
+                            setAuthError("서버 연결에 실패했습니다. Firebase 콘솔에서 '익명 로그인'이 활성화되어 있는지 확인해 주세요.");
+                        }
                     }
                 };
-                initAuth();
+
+                signInWithRetry();
                 const unsubscribe = onAuthStateChanged(auth, setUser);
                 return () => unsubscribe();
             }, []);
 
-            // 2. 실시간 데이터 동기화
             useEffect(() => {
                 if (!user) return;
                 
@@ -123,18 +121,21 @@
                 const unsubS = onSnapshot(sRef, (snap) => {
                     setStudents(snap.docs.map(d => ({ id: d.id, ...d.data() })));
                     setIsDbLoaded(true);
-                }, (error) => console.error("Firestore Students Error:", error));
+                }, (error) => {
+                    console.error("Firestore 학생 데이터 에러:", error);
+                });
 
                 const lRef = collection(db, 'artifacts', appId, 'public', 'data', 'attendanceLogs');
                 const unsubL = onSnapshot(lRef, (snap) => {
                     const logs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                     setAttendanceLogs(logs.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)));
-                }, (error) => console.error("Firestore Logs Error:", error));
+                }, (error) => {
+                    console.error("Firestore 출결 로그 에러:", error);
+                });
 
                 return () => { unsubS(); unsubL(); };
             }, [user]);
 
-            // 학년별 테마
             const gradeThemes = {
                 '1학년': { bg: 'bg-rose-50', text: 'text-rose-600', border: 'border-rose-100', accent: 'bg-rose-500' },
                 '2학년': { bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-orange-100', accent: 'bg-orange-500' },
@@ -144,7 +145,6 @@
                 '6학년': { bg: 'bg-indigo-50', text: 'text-indigo-600', border: 'border-indigo-100', accent: 'bg-indigo-500' },
             };
 
-            // 분반 데이터
             const classes = useMemo(() => {
                 const grades = [1, 2, 3, 4, 5, 6];
                 let all = [];
@@ -176,9 +176,13 @@
             const handleAttendance = async (studentId, status) => {
                 if (!user) return;
                 const logId = `${studentId}-${targetDate}`;
-                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'attendanceLogs', logId), {
-                    studentId, status, date: targetDate, updatedAt: new Date().toISOString()
-                });
+                try {
+                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'attendanceLogs', logId), {
+                        studentId, status, date: targetDate, updatedAt: new Date().toISOString()
+                    });
+                } catch (err) {
+                    console.error("출결 저장 에러:", err);
+                }
             };
 
             const getStatus = (studentId) => attendanceLogs.find(l => l.studentId === studentId && l.date === targetDate)?.status;
@@ -195,17 +199,26 @@
                 return { total, present, absent, unmarked: total - (present + absent) };
             };
 
+            if (authError) return (
+                <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-50 p-6 text-center">
+                    <div className="w-16 h-16 bg-rose-100 text-rose-500 rounded-full flex items-center justify-center mb-4">
+                        <Icon name="alert-circle" size={32} />
+                    </div>
+                    <h2 className="text-xl font-black text-slate-800 mb-2">접속 오류</h2>
+                    <p className="text-sm text-slate-500 max-w-xs leading-relaxed">{authError}</p>
+                    <button onClick={() => window.location.reload()} className="mt-6 px-6 py-3 bg-slate-900 text-white rounded-2xl font-bold">다시 시도</button>
+                </div>
+            );
+
             if (!isDbLoaded && user) return (
                 <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-50 gap-4">
                     <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
-                    <p className="font-bold text-slate-400">군위몰입수학 데이터를 연결 중입니다...</p>
+                    <p className="font-bold text-slate-400">데이터를 불러오는 중...</p>
                 </div>
             );
 
             return (
                 <div className="min-h-screen bg-[#F8FAFC] text-slate-900 flex flex-col md:flex-row h-screen overflow-hidden">
-                    
-                    {/* 모바일 햄버거 메뉴 버튼 */}
                     <button 
                         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
                         className="md:hidden fixed top-4 right-4 z-[60] p-3 bg-slate-900 text-white rounded-2xl shadow-xl"
@@ -213,7 +226,6 @@
                         <Icon name={isSidebarOpen ? "x" : "menu"} size={24} />
                     </button>
 
-                    {/* 사이드바 */}
                     <aside className={`
                         fixed inset-y-0 left-0 w-72 bg-white border-r border-slate-100 flex flex-col p-6 shadow-sm z-50 transition-transform duration-300
                         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 md:static
@@ -243,28 +255,12 @@
                                 </button>
                             ))}
                         </nav>
-
-                        <div className="mt-auto p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                            <div className="flex flex-col gap-1 px-1">
-                                <div className="flex items-center gap-2">
-                                    <div className={`w-2 h-2 rounded-full ${user ? "bg-emerald-500" : "bg-rose-400"}`}></div>
-                                    <span className="text-[11px] font-black text-slate-700">{user ? 'Online' : 'Offline'}</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <Icon name="database" size={14} className="text-slate-300" />
-                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Firestore Syncing</span>
-                                </div>
-                            </div>
-                        </div>
                     </aside>
 
-                    {/* 메인 콘텐츠 */}
                     <main className="flex-1 overflow-y-auto p-6 md:p-10 pt-20 md:pt-10">
                         <header className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 mb-8">
                             <div>
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-                                    {viewMode === 'report' ? 'History Logs' : 'Admin Panel'}
-                                </p>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{viewMode === 'report' ? 'History' : 'Admin'}</p>
                                 <h2 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">
                                     {viewMode === 'manage' ? '전체 분반 현황' : viewMode === 'report' ? '전체 출결 기록' : (activeClassId ? activeClass?.name : '학생 출결 관리')}
                                 </h2>
@@ -282,22 +278,9 @@
                                     <span className="text-sm font-black text-orange-500">{currentDay}요일</span>
                                 </div>
                             )}
-
-                            {viewMode === 'report' && (
-                                <div className="flex items-center gap-3 bg-white px-4 py-3 rounded-2xl border border-slate-200 shadow-sm w-full lg:w-72">
-                                    <Icon name="search" size={16} className="text-slate-300" />
-                                    <input 
-                                        type="text" 
-                                        placeholder="이름 또는 분반 검색" 
-                                        value={reportSearchTerm}
-                                        onChange={(e) => setReportSearchTerm(e.target.value)}
-                                        className="bg-transparent border-none outline-none text-sm font-bold w-full"
-                                    />
-                                </div>
-                            )}
                         </header>
 
-                        {/* 출결 모드 */}
+                        {/* 출결 체크 화면 */}
                         {viewMode === 'attendance' && (
                             <div className="animate-in fade-in slide-in-from-bottom-2">
                                 {!activeClassId ? (
@@ -313,23 +296,22 @@
                                                 >
                                                     <div className="flex items-center gap-2">
                                                         <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg ${theme.accent} text-white`}>{c.grade}</span>
-                                                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg bg-slate-100 text-slate-500 uppercase tracking-tighter`}>{c.days}</span>
                                                     </div>
                                                     <h4 className="text-xl font-black text-slate-900 leading-tight">{c.name}</h4>
                                                     <div className="grid grid-cols-4 gap-2">
-                                                        <div className="bg-slate-50 p-3 rounded-xl flex flex-col items-center">
+                                                        <div className="bg-slate-50 p-3 rounded-xl flex flex-col items-center text-center">
                                                             <span className="text-[9px] font-black text-slate-400">등록</span>
                                                             <span className="font-black text-slate-700">{stats.total}</span>
                                                         </div>
-                                                        <div className="bg-emerald-50 p-3 rounded-xl flex flex-col items-center">
+                                                        <div className="bg-emerald-50 p-3 rounded-xl flex flex-col items-center text-center">
                                                             <span className="text-[9px] font-black text-emerald-400">출석</span>
                                                             <span className="font-black text-emerald-600">{stats.present}</span>
                                                         </div>
-                                                        <div className="bg-rose-50 p-3 rounded-xl flex flex-col items-center">
+                                                        <div className="bg-rose-50 p-3 rounded-xl flex flex-col items-center text-center">
                                                             <span className="text-[9px] font-black text-rose-400">결석</span>
                                                             <span className="font-black text-rose-600">{stats.absent}</span>
                                                         </div>
-                                                        <div className={`p-3 rounded-xl flex flex-col items-center ${stats.unmarked > 0 ? 'bg-amber-50 animate-pulse' : 'bg-slate-50'}`}>
+                                                        <div className={`p-3 rounded-xl flex flex-col items-center text-center ${stats.unmarked > 0 ? 'bg-amber-50 animate-pulse' : 'bg-slate-50'}`}>
                                                             <span className={`text-[9px] font-black ${stats.unmarked > 0 ? 'text-amber-500' : 'text-slate-300'}`}>미체크</span>
                                                             <span className={`font-black ${stats.unmarked > 0 ? 'text-amber-600' : 'text-slate-300'}`}>{stats.unmarked}</span>
                                                         </div>
@@ -347,26 +329,17 @@
                                     <div className="space-y-4">
                                         <div className="flex items-center gap-3 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm sticky top-0 z-10">
                                             <button onClick={() => setActiveClassId(null)} className="p-2 text-slate-400 hover:bg-slate-50 rounded-xl"><Icon name="chevron-left" size={20} /></button>
-                                            <div>
-                                                <h3 className="font-black text-slate-800">{activeClass?.name}</h3>
-                                                <p className="text-[10px] font-bold text-orange-500 tracking-wider">실시간 동기화 중</p>
-                                            </div>
+                                            <h3 className="font-black text-slate-800">{activeClass?.name}</h3>
                                         </div>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-20">
                                             {students.filter(s => s.classId === activeClassId).map(student => {
                                                 const status = getStatus(student.id);
                                                 return (
-                                                    <div key={student.id} className={`bg-white p-6 rounded-[2rem] border transition-all flex flex-col items-center text-center ${!status ? 'border-amber-100 bg-amber-50/5' : 'border-slate-100'}`}>
-                                                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-4 ${status === 'PRESENT' ? 'bg-emerald-500 text-white' : status === 'ABSENT' ? 'bg-rose-500 text-white' : 'bg-slate-100 text-slate-300'}`}>
-                                                            <Icon name={status ? "user" : "help-circle"} size={24} />
-                                                        </div>
-                                                        <h4 className="font-black text-slate-800 mb-1">{student.name}</h4>
-                                                        <p className={`text-[10px] font-black mb-6 ${status === 'PRESENT' ? 'text-emerald-500' : status === 'ABSENT' ? 'text-rose-500' : 'text-amber-500'}`}>
-                                                            {status === 'PRESENT' ? '출석 완료' : status === 'ABSENT' ? '결석 처리' : '체크 대기중'}
-                                                        </p>
+                                                    <div key={student.id} className={`bg-white p-6 rounded-[2rem] border transition-all flex flex-col items-center text-center ${!status ? 'border-amber-100' : 'border-slate-100'}`}>
+                                                        <h4 className="font-black text-slate-800 mb-6">{student.name}</h4>
                                                         <div className="flex gap-2 w-full">
-                                                            <button onClick={() => handleAttendance(student.id, 'PRESENT')} className={`flex-1 py-3 rounded-xl text-xs font-black transition-all ${status === 'PRESENT' ? 'bg-emerald-500 text-white' : 'bg-slate-50 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600'}`}>출석</button>
-                                                            <button onClick={() => handleAttendance(student.id, 'ABSENT')} className={`flex-1 py-3 rounded-xl text-xs font-black transition-all ${status === 'ABSENT' ? 'bg-rose-500 text-white' : 'bg-slate-50 text-slate-400 hover:bg-rose-50 hover:text-rose-600'}`}>결석</button>
+                                                            <button onClick={() => handleAttendance(student.id, 'PRESENT')} className={`flex-1 py-3 rounded-xl text-xs font-black transition-all ${status === 'PRESENT' ? 'bg-emerald-500 text-white' : 'bg-slate-50 text-slate-400 hover:bg-emerald-50'}`}>출석</button>
+                                                            <button onClick={() => handleAttendance(student.id, 'ABSENT')} className={`flex-1 py-3 rounded-xl text-xs font-black transition-all ${status === 'ABSENT' ? 'bg-rose-500 text-white' : 'bg-slate-50 text-slate-400 hover:bg-rose-50'}`}>결석</button>
                                                         </div>
                                                     </div>
                                                 );
@@ -377,47 +350,7 @@
                             </div>
                         )}
 
-                        {/* 리포트 모드 */}
-                        {viewMode === 'report' && (
-                            <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden mb-10">
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-left border-collapse">
-                                        <thead>
-                                            <tr className="bg-slate-50/50 border-b border-slate-50">
-                                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">업데이트</th>
-                                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">학생명</th>
-                                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">상태</th>
-                                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">수업일</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-50">
-                                            {attendanceLogs.filter(l => {
-                                                const s = students.find(st => st.id === l.studentId);
-                                                const c = classes.find(cl => cl.id === s?.classId);
-                                                const search = reportSearchTerm.toLowerCase();
-                                                return s?.name.toLowerCase().includes(search) || c?.name.toLowerCase().includes(search);
-                                            }).map(log => {
-                                                const student = students.find(s => s.id === log.studentId);
-                                                return (
-                                                    <tr key={log.id} className="hover:bg-slate-50/50 transition-colors">
-                                                        <td className="px-6 py-4 text-[11px] font-bold text-slate-400">{new Date(log.updatedAt).toLocaleDateString()}</td>
-                                                        <td className="px-6 py-4 text-xs font-black text-slate-800">{student?.name || '정보 없음'}</td>
-                                                        <td className="px-6 py-4 text-center">
-                                                            <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-black ${log.status === 'PRESENT' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                                                                {log.status === 'PRESENT' ? '출석' : '결석'}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-6 py-4 text-right text-[11px] font-black text-slate-500">{log.date}</td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* 관리 모드 */}
+                        {/* 학생 관리 모드 */}
                         {viewMode === 'manage' && (
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-20">
                                 {Object.keys(gradeThemes).map(grade => {
@@ -427,19 +360,16 @@
                                             <h4 className={`text-xl font-black ${theme.text} mb-6 px-2 flex items-center gap-2`}><Icon name="graduation-cap" size={20} /> {grade}</h4>
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                 {classes.filter(c => c.grade === grade).map(c => (
-                                                    <div key={c.id} className="bg-white/80 p-5 rounded-3xl border border-white flex flex-col h-full shadow-sm">
+                                                    <div key={c.id} className="bg-white p-5 rounded-3xl border border-white flex flex-col h-full shadow-sm">
                                                         <div className="flex justify-between items-start mb-4">
-                                                            <div>
-                                                                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">{c.days} | {c.type === '수' ? '수업' : '학습'}</p>
-                                                                <h5 className="text-xs font-black text-slate-800 leading-tight">{c.name}</h5>
-                                                            </div>
-                                                            <button onClick={() => { setModalTargetClass(c); setShowAddModal(true); }} className="p-2 bg-slate-900 text-white rounded-xl shadow-md hover:bg-orange-500 transition-colors"><Icon name="user-plus" size={14} /></button>
+                                                            <h5 className="text-xs font-black text-slate-800">{c.name}</h5>
+                                                            <button onClick={() => { setModalTargetClass(c); setShowAddModal(true); }} className="p-2 bg-slate-900 text-white rounded-xl"><Icon name="user-plus" size={14} /></button>
                                                         </div>
-                                                        <div className="flex flex-wrap gap-2 mt-auto">
+                                                        <div className="flex flex-wrap gap-2">
                                                             {students.filter(s => s.classId === c.id).map(s => (
-                                                                <div key={s.id} className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-lg border border-slate-100 group shadow-sm">
+                                                                <div key={s.id} className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-lg border border-slate-100">
                                                                     <span className="text-[10px] font-bold text-slate-600">{s.name}</span>
-                                                                    <button onClick={() => setShowDeleteConfirm(s)} className="p-0.5 text-slate-200 hover:text-rose-500"><Icon name="x" size={10} /></button>
+                                                                    <button onClick={() => setShowDeleteConfirm(s)} className="p-0.5 text-slate-300 hover:text-rose-500"><Icon name="x" size={10} /></button>
                                                                 </div>
                                                             ))}
                                                         </div>
@@ -451,54 +381,85 @@
                                 })}
                             </div>
                         )}
+
+                        {/* 출결 리포트 모드 */}
+                        {viewMode === 'report' && (
+                            <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden mb-10">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left border-collapse">
+                                        <thead>
+                                            <tr className="bg-slate-50 border-b border-slate-100">
+                                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">일시</th>
+                                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">학생명</th>
+                                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">상태</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-50">
+                                            {attendanceLogs.map(log => {
+                                                const student = students.find(s => s.id === log.studentId);
+                                                return (
+                                                    <tr key={log.id} className="hover:bg-slate-50/50">
+                                                        <td className="px-6 py-4 text-[11px] font-bold text-slate-400">{log.date}</td>
+                                                        <td className="px-6 py-4 text-xs font-black text-slate-800">{student?.name || 'Unknown'}</td>
+                                                        <td className="px-6 py-4 text-center">
+                                                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-black ${log.status === 'PRESENT' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                                                                {log.status === 'PRESENT' ? '출석' : '결석'}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
                     </main>
 
-                    {/* 모달 창 */}
+                    {/* 등록 모달 */}
                     {showAddModal && (
                         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
                             <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl scale-in-center">
-                                <h3 className="text-xl font-black text-slate-900 mb-1 text-center">학생 등록</h3>
-                                <p className="text-xs font-bold text-slate-400 mb-8 text-center">{modalTargetClass?.name}</p>
+                                <h3 className="text-xl font-black text-slate-900 mb-8 text-center">학생 등록</h3>
                                 <input 
                                     autoFocus type="text" placeholder="이름을 입력하세요"
                                     value={newStudentName} onChange={(e) => setNewStudentName(e.target.value)}
-                                    onKeyDown={async (e) => {
-                                        if (e.key === 'Enter' && newStudentName.trim() && user) {
+                                    className="w-full bg-slate-50 border-2 border-slate-50 rounded-2xl px-5 py-4 font-bold outline-none focus:border-orange-500 mb-6"
+                                />
+                                <div className="flex gap-2">
+                                    <button onClick={() => setShowAddModal(false)} className="flex-1 py-4 font-black text-slate-400 bg-slate-50 rounded-2xl">취소</button>
+                                    <button onClick={async () => {
+                                        if (!newStudentName.trim()) return;
+                                        try {
                                             await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'students'), {
                                                 name: newStudentName, classId: modalTargetClass.id, createdAt: new Date().toISOString()
                                             });
                                             setNewStudentName(''); setShowAddModal(false);
+                                        } catch (err) {
+                                            console.error("학생 추가 에러:", err);
                                         }
-                                    }}
-                                    className="w-full bg-slate-50 border-2 border-slate-50 rounded-2xl px-5 py-4 font-bold outline-none focus:border-orange-500 mb-6"
-                                />
-                                <div className="flex gap-2">
-                                    <button onClick={() => setShowAddModal(false)} className="flex-1 py-4 font-black text-slate-400 bg-slate-50 rounded-2xl text-xs">취소</button>
-                                    <button onClick={async () => {
-                                        if (!newStudentName.trim() || !user) return;
-                                        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'students'), {
-                                            name: newStudentName, classId: modalTargetClass.id, createdAt: new Date().toISOString()
-                                        });
-                                        setNewStudentName(''); setShowAddModal(false);
-                                    }} className="flex-1 py-4 font-black text-white bg-slate-900 rounded-2xl text-xs shadow-xl">등록</button>
+                                    }} className="flex-1 py-4 font-black text-white bg-slate-900 rounded-2xl">등록</button>
                                 </div>
                             </div>
                         </div>
                     )}
 
+                    {/* 삭제 확인 모달 */}
                     {showDeleteConfirm && (
                         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-6 text-center">
                             <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl scale-in-center">
-                                <div className="w-14 h-14 bg-rose-50 text-rose-500 rounded-2xl flex items-center justify-center mx-auto mb-6"><Icon name="alert-circle" size={32} /></div>
                                 <h3 className="text-xl font-black text-slate-900 mb-2">학생 정보를 삭제할까요?</h3>
-                                <p className="text-xs font-bold text-slate-400 mb-8"><span className="text-rose-500 font-black">[{showDeleteConfirm.name}]</span> 학생의 모든 기록이 제거됩니다.</p>
+                                <p className="text-xs font-bold text-slate-400 mb-8">[{showDeleteConfirm.name}] 학생의 기록이 모두 삭제됩니다.</p>
                                 <div className="flex gap-2">
-                                    <button onClick={() => setShowDeleteConfirm(null)} className="flex-1 py-4 font-black text-slate-400 bg-slate-50 rounded-2xl text-xs">취소</button>
+                                    <button onClick={() => setShowDeleteConfirm(null)} className="flex-1 py-4 font-black text-slate-400 bg-slate-50 rounded-2xl">취소</button>
                                     <button onClick={async () => {
-                                        if (!user) return;
-                                        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', showDeleteConfirm.id));
-                                        setShowDeleteConfirm(null);
-                                    }} className="flex-1 py-4 font-black text-white bg-rose-500 rounded-2xl text-xs shadow-xl">삭제 확정</button>
+                                        try {
+                                            await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', showDeleteConfirm.id));
+                                            setShowDeleteConfirm(null);
+                                        } catch (err) {
+                                            console.error("학생 삭제 에러:", err);
+                                        }
+                                    }} className="flex-1 py-4 font-black text-white bg-rose-500 rounded-2xl">삭제</button>
                                 </div>
                             </div>
                         </div>
