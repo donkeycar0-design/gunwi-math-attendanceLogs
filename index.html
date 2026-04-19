@@ -8,173 +8,411 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="몰입수학">
 
-    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;700;900&display=swap');
-        * { box-sizing: border-box; }
-        body { font-family: 'Pretendard', sans-serif; -webkit-tap-highlight-color: transparent; margin: 0; }
-        .scale-in { animation: scaleIn .25s cubic-bezier(.34,1.56,.64,1) both; }
-        @keyframes scaleIn { from { transform: scale(.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-        .fade-in { animation: fadeIn .3s ease both; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-        input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.4; cursor: pointer; }
+    @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;700;900&display=swap');
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Pretendard', sans-serif; background: #F5F6FA; color: #0f172a; -webkit-tap-highlight-color: transparent; overflow: hidden; height: 100dvh; }
+    button { cursor: pointer; border: none; background: none; font-family: inherit; }
+    input, select { font-family: inherit; }
+    table { border-collapse: collapse; width: 100%; }
+
+    /* ── 레이아웃 ── */
+    .app-shell { display: flex; height: 100dvh; overflow: hidden; }
+    .sidebar {
+        width: 240px; min-width: 240px; background: #fff;
+        border-right: 1px solid #f1f5f9; display: flex; flex-direction: column;
+        padding: 24px 20px; z-index: 50; transition: transform .3s ease;
+    }
+    .sidebar-logo { display: flex; align-items: center; gap: 12px; margin-bottom: 36px; margin-top: 4px; }
+    .logo-icon { width: 44px; height: 44px; background: #0f172a; border-radius: 14px; display: flex; align-items: center; justify-content: center; color: #fb923c; transform: rotate(-3deg); flex-shrink: 0; }
+    .logo-title { font-size: 15px; font-weight: 900; color: #0f172a; line-height: 1.1; }
+    .logo-sub   { font-size: 9px; font-weight: 900; color: #f97316; letter-spacing: .1em; text-transform: uppercase; margin-top: 3px; }
+    .nav { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+    .nav-btn { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 16px; font-size: 13px; font-weight: 900; color: #94a3b8; transition: all .2s; width: 100%; text-align: left; }
+    .nav-btn:hover { background: #f8fafc; color: #475569; }
+    .nav-btn.active-orange { background: #f97316; color: #fff; }
+    .nav-btn.active-dark   { background: #0f172a; color: #fff; }
+    .nav-btn.active-indigo { background: #6366f1; color: #fff; }
+    .sidebar-footer { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+    .refresh-btn { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px; border-radius: 14px; font-size: 11px; font-weight: 700; color: #94a3b8; transition: background .2s; width: 100%; }
+    .refresh-btn:hover { background: #f8fafc; }
+    .db-card { background: #f8fafc; border: 1px solid #f1f5f9; border-radius: 14px; padding: 10px 14px; }
+    .db-card-label { font-size: 9px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: .1em; margin-bottom: 2px; }
+    .db-card-val { font-size: 11px; font-weight: 700; color: #64748b; }
+    .db-card-sub { font-size: 10px; color: #94a3b8; margin-top: 2px; }
+    .main { flex: 1; overflow-y: auto; padding: 36px 40px; }
+    .main-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 32px; flex-wrap: wrap; }
+    .header-eyebrow { font-size: 9px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: .15em; margin-bottom: 4px; }
+    .header-title { font-size: 28px; font-weight: 900; color: #0f172a; letter-spacing: -.03em; }
+    .date-picker-bar { display: flex; align-items: center; gap: 12px; background: #fff; border: 1px solid #f1f5f9; border-radius: 16px; padding: 10px 18px; box-shadow: 0 1px 4px rgba(0,0,0,.04); }
+    .date-picker-bar input[type="date"] { font-size: 13px; font-weight: 900; color: #475569; border: none; outline: none; background: transparent; }
+    .date-divider { width: 1px; height: 14px; background: #e2e8f0; }
+    .day-badge { font-size: 13px; font-weight: 900; color: #f97316; }
+    .mobile-menu-btn { display: none; position: fixed; top: 14px; right: 14px; z-index: 60; width: 44px; height: 44px; background: #0f172a; color: #fff; border-radius: 14px; align-items: center; justify-content: center; box-shadow: 0 4px 16px rgba(0,0,0,.2); }
+    .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(15,23,42,.3); z-index: 40; backdrop-filter: blur(4px); }
+
+    /* ── 그리드 ── */
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+
+    /* ── 카드 ── */
+    .card { background: #fff; border: 1px solid #f1f5f9; border-radius: 24px; box-shadow: 0 1px 4px rgba(0,0,0,.04); }
+    .stat-card { padding: 20px; }
+    .stat-label { font-size: 10px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: .1em; margin-bottom: 4px; }
+    .stat-val { font-size: 32px; font-weight: 900; }
+
+    /* ── 분반 카드 ── */
+    .class-card { background: #fff; border: 1px solid #f1f5f9; border-radius: 28px; padding: 24px; box-shadow: 0 1px 4px rgba(0,0,0,.04); cursor: pointer; text-align: left; transition: box-shadow .2s, transform .2s; display: flex; flex-direction: column; gap: 16px; width: 100%; }
+    .class-card:hover { box-shadow: 0 8px 32px rgba(0,0,0,.1); transform: translateY(-2px); }
+    .class-card-name { font-size: 20px; font-weight: 900; color: #0f172a; }
+    .class-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .class-stat-box { padding: 10px; border-radius: 14px; display: flex; flex-direction: column; align-items: center; }
+    .class-stat-lbl { font-size: 9px; font-weight: 900; }
+    .class-stat-val { font-size: 18px; font-weight: 900; line-height: 1.2; }
+    .pct-row { display: flex; justify-content: space-between; font-size: 10px; font-weight: 900; color: #94a3b8; margin-bottom: 6px; }
+    .pct-bar  { width: 100%; height: 8px; background: #f1f5f9; border-radius: 99px; overflow: hidden; }
+    .pct-fill { height: 100%; background: #34d399; border-radius: 99px; transition: width .5s; }
+
+    /* ── 출결 카드 ── */
+    .att-card { background: #fff; border: 2px solid #fef3c7; border-radius: 28px; padding: 24px; display: flex; flex-direction: column; align-items: center; text-align: center; transition: border-color .2s; }
+    .att-card.present { border-color: #a7f3d0; }
+    .att-card.absent  { border-color: #fecaca; }
+    .att-avatar { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 900; margin-bottom: 16px; background: #f1f5f9; color: #94a3b8; }
+    .att-avatar.present { background: #d1fae5; color: #059669; }
+    .att-avatar.absent  { background: #fee2e2; color: #dc2626; }
+    .att-name { font-weight: 900; color: #1e293b; margin-bottom: 20px; }
+    .att-btns { display: flex; gap: 8px; width: 100%; }
+    .att-btn { flex: 1; padding: 12px; border-radius: 14px; font-size: 12px; font-weight: 900; background: #f8fafc; color: #94a3b8; transition: all .15s; }
+    .att-btn.btn-present.active { background: #10b981; color: #fff; box-shadow: 0 2px 8px rgba(16,185,129,.3); }
+    .att-btn.btn-absent.active  { background: #ef4444; color: #fff; box-shadow: 0 2px 8px rgba(239,68,68,.3); }
+
+    /* ── 학생 관리 ── */
+    .grade-section { border-radius: 32px; padding: 24px; border: 1px solid; }
+    .grade-title { font-size: 20px; font-weight: 900; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+    .manage-class-card { background: #fff; border: 1px solid rgba(255,255,255,.8); border-radius: 24px; padding: 20px; display: flex; flex-direction: column; box-shadow: 0 1px 4px rgba(0,0,0,.04); }
+    .manage-class-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+    .manage-class-name  { font-size: 12px; font-weight: 900; color: #1e293b; }
+    .manage-class-count { font-size: 10px; font-weight: 700; color: #94a3b8; margin-top: 2px; }
+    .add-btn { width: 32px; height: 32px; background: #0f172a; color: #fff; border-radius: 12px; display: flex; align-items: center; justify-content: center; transition: background .2s; flex-shrink: 0; }
+    .add-btn:hover { background: #334155; }
+    .student-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .student-tag { display: flex; align-items: center; gap: 4px; background: #f8fafc; border: 1px solid #f1f5f9; border-radius: 10px; padding: 4px 8px; }
+    .student-tag-name { font-size: 11px; font-weight: 700; color: #475569; }
+    .student-tag-del { color: #cbd5e1; transition: color .15s; display: flex; }
+    .student-tag-del:hover { color: #ef4444; }
+
+    /* ── 리포트 ── */
+    .search-bar { background: #fff; border: 1px solid #f1f5f9; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.04); }
+    .search-input-wrap { position: relative; }
+    .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #cbd5e1; pointer-events: none; }
+    .search-input { width: 100%; padding: 12px 40px; background: #f8fafc; border: 2px solid transparent; border-radius: 14px; font-size: 13px; font-weight: 700; outline: none; transition: border-color .2s; color: #1e293b; }
+    .search-input:focus { border-color: #fb923c; }
+    .search-clear { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: #cbd5e1; display: flex; }
+    .search-clear:hover { color: #64748b; }
+    .filter-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .filter-btn { padding: 8px 14px; border-radius: 12px; font-size: 12px; font-weight: 900; background: #f8fafc; color: #94a3b8; transition: all .15s; }
+    .filter-btn:hover { background: #f1f5f9; }
+    .filter-btn.f-all     { background: #0f172a; color: #fff; }
+    .filter-btn.f-present { background: #10b981; color: #fff; }
+    .filter-btn.f-absent  { background: #ef4444; color: #fff; }
+    .filter-select { padding: 8px 12px; border-radius: 12px; font-size: 12px; font-weight: 900; background: #f8fafc; color: #94a3b8; border: 2px solid transparent; outline: none; transition: all .15s; cursor: pointer; }
+    .filter-select.active { border-color: #6366f1; background: #eef2ff; color: #4338ca; }
+    .filter-date { padding: 8px 12px; border-radius: 12px; font-size: 12px; font-weight: 900; background: #f8fafc; color: #94a3b8; border: 2px solid transparent; outline: none; transition: all .15s; }
+    .filter-date.active { border-color: #3b82f6; background: #eff6ff; color: #1d4ed8; }
+    .filter-tilde { font-size: 12px; font-weight: 900; color: #cbd5e1; }
+    .clear-btn { display: flex; align-items: center; gap: 4px; padding: 8px 12px; border-radius: 12px; font-size: 12px; font-weight: 900; background: #f1f5f9; color: #64748b; transition: background .15s; }
+    .clear-btn:hover { background: #e2e8f0; }
+    .search-count { font-size: 11px; font-weight: 700; color: #94a3b8; border-top: 1px solid #f8fafc; padding-top: 8px; }
+    .report-table-wrap { background: #fff; border: 1px solid #f1f5f9; border-radius: 28px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.04); }
+    .report-table-scroll { overflow-x: auto; }
+    .report-table thead tr { background: #f8fafc; border-bottom: 1px solid #f1f5f9; }
+    .report-table th { padding: 16px 24px; font-size: 10px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: .12em; white-space: nowrap; }
+    .report-table tbody tr { border-bottom: 1px solid #f8fafc; transition: background .15s; }
+    .report-table tbody tr:last-child { border-bottom: none; }
+    .report-table tbody tr:hover { background: rgba(248,250,252,.7); }
+    .report-table td { padding: 16px 24px; }
+    .td-date  { font-size: 11px; font-weight: 700; color: #94a3b8; white-space: nowrap; }
+    .td-name  { font-size: 12px; font-weight: 900; color: #1e293b; }
+    .td-class { font-size: 11px; font-weight: 700; color: #64748b; white-space: nowrap; }
+    .td-time  { font-size: 11px; font-weight: 700; color: #cbd5e1; white-space: nowrap; }
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 99px; font-size: 10px; font-weight: 900; }
+    .badge-present { background: #ecfdf5; color: #059669; }
+    .badge-absent  { background: #fef2f2; color: #dc2626; }
+    .empty-cell { padding: 64px 24px; text-align: center; font-weight: 700; color: #cbd5e1; }
+
+    /* ── 뱃지 ── */
+    .grade-badge { font-size: 10px; font-weight: 900; padding: 4px 10px; border-radius: 10px; color: #fff; display: inline-block; }
+    .unmarked-badge { font-size: 10px; font-weight: 900; padding: 4px 10px; border-radius: 10px; background: #fef3c7; color: #d97706; animation: pulse 1.5s infinite; }
+
+    /* ── 스티키바 ── */
+    .sticky-bar { position: sticky; top: 0; z-index: 10; background: #fff; border: 1px solid #f1f5f9; border-radius: 18px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,.04); }
+    .back-btn { width: 36px; height: 36px; border-radius: 12px; color: #94a3b8; display: flex; align-items: center; justify-content: center; transition: background .15s; }
+    .back-btn:hover { background: #f8fafc; }
+    .sticky-title { font-weight: 900; color: #1e293b; }
+    .sync-indicator { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: #94a3b8; }
+
+    /* ── 빈 화면 ── */
+    .empty-box { padding: 96px 24px; background: #fff; border: 2px dashed #e2e8f0; border-radius: 28px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #cbd5e1; text-align: center; gap: 8px; }
+    .empty-box p { font-weight: 700; font-size: 16px; }
+    .empty-box span { font-size: 13px; }
+
+    /* ── 모달 ── */
+    .modal-overlay { position: fixed; inset: 0; z-index: 100; background: rgba(15,23,42,.4); backdrop-filter: blur(6px); display: flex; align-items: flex-end; justify-content: center; padding: 16px; }
+    .modal-box { background: #fff; width: 100%; max-width: 400px; border-radius: 32px; padding: 32px; box-shadow: 0 24px 64px rgba(0,0,0,.15); animation: scaleIn .25s cubic-bezier(.34,1.56,.64,1) both; }
+    .modal-title { font-size: 20px; font-weight: 900; color: #0f172a; text-align: center; margin-bottom: 4px; }
+    .modal-sub   { font-size: 12px; font-weight: 700; color: #94a3b8; text-align: center; margin-bottom: 28px; }
+    .modal-input { width: 100%; background: #f8fafc; border: 2px solid transparent; border-radius: 18px; padding: 16px 20px; font-size: 15px; font-weight: 700; outline: none; transition: border-color .2s; margin-bottom: 20px; color: #0f172a; }
+    .modal-input:focus { border-color: #fb923c; }
+    .modal-btns { display: flex; gap: 8px; }
+    .btn-cancel  { flex: 1; padding: 16px; font-size: 15px; font-weight: 900; color: #94a3b8; background: #f8fafc; border-radius: 18px; transition: background .15s; }
+    .btn-cancel:hover  { background: #f1f5f9; }
+    .btn-confirm { flex: 1; padding: 16px; font-size: 15px; font-weight: 900; color: #fff; background: #0f172a; border-radius: 18px; transition: background .15s; }
+    .btn-confirm:hover { background: #1e293b; }
+    .btn-danger  { flex: 1; padding: 16px; font-size: 15px; font-weight: 900; color: #fff; background: #ef4444; border-radius: 18px; transition: opacity .15s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .btn-danger:disabled { opacity: .6; }
+    .delete-icon-wrap { width: 56px; height: 56px; background: #fef2f2; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; }
+
+    /* ── 토스트 ── */
+    .toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%); z-index: 200; padding: 12px 20px; border-radius: 16px; font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 8px; animation: scaleIn .25s cubic-bezier(.34,1.56,.64,1) both; white-space: nowrap; box-shadow: 0 8px 24px rgba(0,0,0,.15); }
+    .toast-success { background: #0f172a; color: #fff; }
+    .toast-error   { background: #ef4444; color: #fff; }
+
+    /* ── 로딩/에러 ── */
+    .full-center { height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; background: #f8fafc; padding: 32px; text-align: center; }
+    .spinner { width: 44px; height: 44px; border: 4px solid #f97316; border-top-color: transparent; border-radius: 50%; animation: spin .8s linear infinite; }
+    .error-icon { width: 64px; height: 64px; background: #fee2e2; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #ef4444; }
+
+    /* ── 애니메이션 ── */
+    @keyframes scaleIn { from { transform: scale(.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    @keyframes fadeIn  { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    @keyframes spin    { to { transform: rotate(360deg); } }
+    @keyframes pulse   { 0%,100%{opacity:1} 50%{opacity:.6} }
+    .fade-in { animation: fadeIn .3s ease both; }
+    .spin    { animation: spin .8s linear infinite; }
+
+    /* ── 학년 색상 ── */
+    .g1  { background:#fff1f2; border-color:#ffe4e6; } .g1t { color:#e11d48; } .g1a { background:#e11d48; }
+    .g2  { background:#fff7ed; border-color:#ffedd5; } .g2t { color:#ea580c; } .g2a { background:#ea580c; }
+    .g3  { background:#fffbeb; border-color:#fef3c7; } .g3t { color:#d97706; } .g3a { background:#d97706; }
+    .g4  { background:#ecfdf5; border-color:#d1fae5; } .g4t { color:#059669; } .g4a { background:#059669; }
+    .g5  { background:#eff6ff; border-color:#dbeafe; } .g5t { color:#2563eb; } .g5a { background:#2563eb; }
+    .g6  { background:#eef2ff; border-color:#e0e7ff; } .g6t { color:#4f46e5; } .g6a { background:#4f46e5; }
+
+    /* ── 반응형 ── */
+    @media (max-width: 768px) {
+        .sidebar { position: fixed; inset-y: 0; left: 0; transform: translateX(-100%); box-shadow: 4px 0 24px rgba(0,0,0,.08); }
+        .sidebar.open { transform: translateX(0); }
+        .sidebar-overlay.open { display: block; }
+        .mobile-menu-btn { display: flex; }
+        .main { padding: 20px 16px; padding-top: 72px; }
+        .grid-4 { grid-template-columns: repeat(2, 1fr); }
+        .grid-2 { grid-template-columns: 1fr; }
+        .header-title { font-size: 22px; }
+        .modal-overlay { align-items: flex-end; }
+    }
+    @media (min-width: 769px)  { .modal-overlay { align-items: center; } }
+    @media (min-width: 1024px) { .att-grid { grid-template-columns: repeat(3, 1fr) !important; } }
+    @media (min-width: 1280px) { .att-grid { grid-template-columns: repeat(4, 1fr) !important; } }
     </style>
 </head>
-<body class="bg-[#F5F6FA]">
+<body>
 <div id="root"></div>
 
 <script type="text/babel">
-const { useState, useMemo, useEffect, useCallback, useRef } = React;
+const { useState, useMemo, useEffect, useCallback } = React;
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// ⚙️  여기에 Apps Script 배포 URL을 붙여넣으세요
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+/* ━━━ ⚙️  배포 URL 입력 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyMxKcsO1WpvtX-97d7DXMRm06TwgaNKLiEWhNKon3cRVAqupxhAdjbYVcZjF7gmNdV6g/exec';
 
-// ── KST 날짜 헬퍼 ────────────────────────────────────────
 const getKSTDate = (d = new Date()) =>
     new Date(d.getTime() + 9 * 3600 * 1000).toISOString().split('T')[0];
-
-const parseLocalDate = (str) => {
+const parseLocalDate = str => {
     const [y, m, d] = str.split('-').map(Number);
     return new Date(y, m - 1, d);
 };
 
-// ── API 헬퍼 ─────────────────────────────────────────────
 const api = {
-    get: (action) =>
-        fetch(`${SCRIPT_URL}?action=${action}`)
-            .then(r => r.json()),
-
-    post: (body) =>
-        fetch(SCRIPT_URL, {
-            method: 'POST',
-            body: JSON.stringify(body),
-        }).then(r => r.json()),
+    get:  action => fetch(`${SCRIPT_URL}?action=${action}`).then(r => r.json()),
+    post: body   => fetch(SCRIPT_URL, { method:'POST', body:JSON.stringify(body) }).then(r => r.json()),
 };
 
-// ── SVG 아이콘 ────────────────────────────────────────────
 const PATHS = {
-    sparkles:       "M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z",
-    "user-check":   "M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
-    settings:       "M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z M15 12a3 3 0 11-6 0 3 3 0 016 0z",
-    "file-text":    "M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z",
-    "user-plus":    "M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z",
-    "graduation":   "M4.26 10.147a60.436 60.436 0 00-.491 6.347A48.627 48.627 0 0112 20.904a48.627 48.627 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.57 50.57 0 00-2.658-.813A59.905 59.905 0 0112 3.493a59.902 59.902 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0112 13.489a50.702 50.702 0 017.74-3.342M6.75 15a.75.75 0 100-1.5.75.75 0 000 1.5zm0 0v-3.675A55.378 55.378 0 0112 8.443m-7.007 11.55A5.981 5.981 0 006.75 15.75v-1.5",
-    "calendar":     "M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5m-9-6h.008v.008H12v-.008zM12 15h.008v.008H12V15zm0 2.25h.008v.008H12v-.008zM9.75 15h.008v.008H9.75V15zm0 2.25h.008v.008H9.75v-.008zM7.5 15h.008v.008H7.5V15zm0 2.25h.008v.008H7.5v-.008zm6.75-4.5h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V15zm0 2.25h.008v.008h-.008v-.008zm2.25-4.5h.008v.008H16.5v-.008zm0 2.25h.008v.008H16.5V15z",
-    "chevron-left": "M15.75 19.5L8.25 12l7.5-7.5",
-    "alert":        "M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z",
-    "menu":         "M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5",
-    "x":            "M6 18L18 6M6 6l12 12",
-    "trash":        "M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0",
-    "refresh":      "M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99",
-    "check":        "M4.5 12.75l6 6 9-13.5",
+    sparkles:     "M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z",
+    "user-check": "M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
+    settings:     "M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z M15 12a3 3 0 11-6 0 3 3 0 016 0z",
+    "file-text":  "M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z",
+    "user-plus":  "M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z",
+    graduation:   "M4.26 10.147a60.436 60.436 0 00-.491 6.347A48.627 48.627 0 0112 20.904a48.627 48.627 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.57 50.57 0 00-2.658-.813A59.905 59.905 0 0112 3.493a59.902 59.902 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0112 13.489a50.702 50.702 0 017.74-3.342M6.75 15a.75.75 0 100-1.5.75.75 0 000 1.5zm0 0v-3.675A55.378 55.378 0 0112 8.443m-7.007 11.55A5.981 5.981 0 006.75 15.75v-1.5",
+    calendar:     "M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5",
+    "chevron-l":  "M15.75 19.5L8.25 12l7.5-7.5",
+    alert:        "M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z",
+    menu:         "M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5",
+    x:            "M6 18L18 6M6 6l12 12",
+    trash:        "M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0",
+    refresh:      "M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99",
+    check:        "M4.5 12.75l6 6 9-13.5",
+};
+const Icon = ({ name, size=20, cls='', style:s={} }) => {
+    const d = PATHS[name]; if (!d) return null;
+    return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={cls} style={s}><path d={d}/></svg>;
 };
 
-const Icon = ({ name, size = 20, className = '' }) => {
-    const d = PATHS[name];
-    if (!d) return null;
-    return (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
-            strokeLinejoin="round" className={className}>
-            <path d={d} />
-        </svg>
-    );
-};
-
-// ── 분반 정의 ─────────────────────────────────────────────
-const GRADE_THEMES = {
-    '1학년': { bg: 'bg-rose-50',    text: 'text-rose-600',    border: 'border-rose-100',    accent: 'bg-rose-500',    dot: '#f43f5e' },
-    '2학년': { bg: 'bg-orange-50',  text: 'text-orange-600',  border: 'border-orange-100',  accent: 'bg-orange-500',  dot: '#f97316' },
-    '3학년': { bg: 'bg-amber-50',   text: 'text-amber-600',   border: 'border-amber-100',   accent: 'bg-amber-500',   dot: '#f59e0b' },
-    '4학년': { bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-100', accent: 'bg-emerald-500', dot: '#10b981' },
-    '5학년': { bg: 'bg-blue-50',    text: 'text-blue-600',    border: 'border-blue-100',    accent: 'bg-blue-500',    dot: '#3b82f6' },
-    '6학년': { bg: 'bg-indigo-50',  text: 'text-indigo-600',  border: 'border-indigo-100',  accent: 'bg-indigo-500',  dot: '#6366f1' },
-};
-
+const GRADE_KEYS = ['1학년','2학년','3학년','4학년','5학년','6학년'];
+const GRADE_CSS  = {'1학년':'g1','2학년':'g2','3학년':'g3','4학년':'g4','5학년':'g5','6학년':'g6'};
 const ALL_CLASSES = (() => {
     const out = [];
     [1,2,3,4,5,6].forEach(g => {
         const grade = `${g}학년`;
         out.push(
-            { id: `e${g}-mw-s`, name: `초등 ${g} 월목 (수업)`, grade, days: '월목' },
-            { id: `e${g}-mw-h`, name: `초등 ${g} 월목 (학습)`, grade, days: '월목' },
-            { id: `e${g}-hg-s`, name: `초등 ${g} 화금 (수업)`, grade, days: '화금' },
-            { id: `e${g}-hg-h`, name: `초등 ${g} 화금 (학습)`, grade, days: '화금' },
+            {id:`e${g}-mw-s`,name:`초등 ${g} 월목 (수업)`,grade,days:'월목'},
+            {id:`e${g}-mw-h`,name:`초등 ${g} 월목 (학습)`,grade,days:'월목'},
+            {id:`e${g}-hg-s`,name:`초등 ${g} 화금 (수업)`,grade,days:'화금'},
+            {id:`e${g}-hg-h`,name:`초등 ${g} 화금 (학습)`,grade,days:'화금'},
         );
     });
     return out;
 })();
 
-// ── 토스트 컴포넌트 ───────────────────────────────────────
-const Toast = ({ message, type = 'success', onDone }) => {
-    useEffect(() => {
-        const t = setTimeout(onDone, 2200);
-        return () => clearTimeout(t);
-    }, []);
-    const colors = type === 'success'
-        ? 'bg-slate-900 text-white'
-        : 'bg-rose-500 text-white';
+const Toast = ({ message, type='success', onDone }) => {
+    useEffect(() => { const t = setTimeout(onDone, 2200); return () => clearTimeout(t); }, []);
+    return <div className={`toast toast-${type}`}><Icon name={type==='success'?'check':'alert'} size={15}/>{message}</div>;
+};
+
+/* ── 리포트 뷰 ── */
+const ReportView = ({ logs, students }) => {
+    const [searchName,   setSearchName]   = useState('');
+    const [filterStatus, setFilterStatus] = useState('ALL');
+    const [filterGrade,  setFilterGrade]  = useState('ALL');
+    const [dateFrom,     setDateFrom]     = useState('');
+    const [dateTo,       setDateTo]       = useState('');
+
+    const filtered = useMemo(() => logs.filter(log => {
+        const student = students.find(s => s.ID === log.StudentID);
+        const cls     = student ? ALL_CLASSES.find(c => c.id === student.ClassID) : null;
+        if (searchName.trim() && !(student?.Name||'').includes(searchName.trim())) return false;
+        if (filterStatus !== 'ALL' && log.Status !== filterStatus) return false;
+        if (filterGrade  !== 'ALL' && cls?.grade  !== filterGrade)  return false;
+        if (dateFrom && log.Date < dateFrom) return false;
+        if (dateTo   && log.Date > dateTo)   return false;
+        return true;
+    }), [logs, students, searchName, filterStatus, filterGrade, dateFrom, dateTo]);
+
+    const hasFilter = searchName || filterStatus !== 'ALL' || filterGrade !== 'ALL' || dateFrom || dateTo;
+    const clearAll  = () => { setSearchName(''); setFilterStatus('ALL'); setFilterGrade('ALL'); setDateFrom(''); setDateTo(''); };
+
     return (
-        <div className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-[200] px-5 py-3 rounded-2xl shadow-xl flex items-center gap-2 text-sm font-bold scale-in ${colors}`}>
-            <Icon name={type === 'success' ? 'check' : 'alert'} size={16} />
-            {message}
+        <div className="fade-in" style={{display:'flex',flexDirection:'column',gap:20,paddingBottom:40}}>
+            <div className="grid-4">
+                {[
+                    {label:'전체 로그', val:logs.length,                                color:'#0f172a'},
+                    {label:'출석',      val:logs.filter(l=>l.Status==='PRESENT').length, color:'#059669'},
+                    {label:'결석',      val:logs.filter(l=>l.Status==='ABSENT').length,  color:'#dc2626'},
+                    {label:'등록 학생', val:students.length,                             color:'#4f46e5'},
+                ].map(item => (
+                    <div key={item.label} className="card stat-card">
+                        <div className="stat-label">{item.label}</div>
+                        <div className="stat-val" style={{color:item.color}}>{item.val}</div>
+                    </div>
+                ))}
+            </div>
+
+            <div className="search-bar">
+                <div className="search-input-wrap">
+                    <svg className="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                    <input className="search-input" type="text" placeholder="학생 이름으로 검색..."
+                        value={searchName} onChange={e => setSearchName(e.target.value)} />
+                    {searchName && <button className="search-clear" onClick={() => setSearchName('')}><Icon name="x" size={14}/></button>}
+                </div>
+                <div className="filter-row">
+                    {[{val:'ALL',label:'전체',a:'f-all'},{val:'PRESENT',label:'출석',a:'f-present'},{val:'ABSENT',label:'결석',a:'f-absent'}].map(b => (
+                        <button key={b.val} className={`filter-btn ${filterStatus===b.val?b.a:''}`} onClick={() => setFilterStatus(b.val)}>{b.label}</button>
+                    ))}
+                    <select className={`filter-select ${filterGrade!=='ALL'?'active':''}`} value={filterGrade} onChange={e => setFilterGrade(e.target.value)}>
+                        <option value="ALL">전체 학년</option>
+                        {GRADE_KEYS.map(g => <option key={g} value={g}>{g}</option>)}
+                    </select>
+                    <input className={`filter-date ${dateFrom?'active':''}`} type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+                    <span className="filter-tilde">~</span>
+                    <input className={`filter-date ${dateTo?'active':''}`} type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} />
+                    {hasFilter && <button className="clear-btn" onClick={clearAll}><Icon name="x" size={11}/> 초기화</button>}
+                </div>
+                <div className="search-count">
+                    {hasFilter
+                        ? <><span style={{color:'#f97316',fontWeight:900}}>{filtered.length}건</span> / 전체 {logs.length}건</>
+                        : <>전체 <span style={{color:'#1e293b',fontWeight:900}}>{logs.length}건</span></>}
+                    {hasFilter && filtered.length === 0 && <span style={{color:'#ef4444',marginLeft:12}}>검색 결과가 없습니다</span>}
+                </div>
+            </div>
+
+            <div className="report-table-wrap">
+                <div className="report-table-scroll">
+                    <table className="report-table">
+                        <thead><tr>{['날짜','학생명','반','상태','기록시각'].map(h => <th key={h}>{h}</th>)}</tr></thead>
+                        <tbody>
+                            {filtered.length === 0
+                                ? <tr><td className="empty-cell" colSpan={5}>{hasFilter?'검색 조건에 맞는 기록이 없습니다':'출결 기록이 없습니다'}</td></tr>
+                                : filtered.map(log => {
+                                    const student = students.find(s => s.ID === log.StudentID);
+                                    const cls     = student ? ALL_CLASSES.find(c => c.id === student.ClassID) : null;
+                                    const name    = student?.Name || '—';
+                                    const hi      = searchName.trim() && name.includes(searchName.trim())
+                                        ? name.replace(searchName.trim(), `<mark style="background:#fef08a;border-radius:3px;padding:0 2px">${searchName.trim()}</mark>`)
+                                        : null;
+                                    return (
+                                        <tr key={log.LogID}>
+                                            <td className="td-date">{log.Date}</td>
+                                            <td className="td-name">{hi ? <span dangerouslySetInnerHTML={{__html:hi}}/> : name}</td>
+                                            <td className="td-class">{cls?.name||'—'}</td>
+                                            <td><span className={`badge badge-${log.Status==='PRESENT'?'present':'absent'}`}>{log.Status==='PRESENT'?'출석':'결석'}</span></td>
+                                            <td className="td-time">{log.UpdatedAt ? new Date(log.UpdatedAt).toLocaleString('ko-KR') : '—'}</td>
+                                        </tr>
+                                    );
+                                })
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     );
 };
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 메인 앱
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+/* ━━━ 메인 앱 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 const App = () => {
     const [students,      setStudents]      = useState([]);
     const [logs,          setLogs]          = useState([]);
     const [loading,       setLoading]       = useState(true);
     const [apiError,      setApiError]      = useState(null);
-    const [syncing,       setSyncing]       = useState(false);   // 저장 중 표시용
-
+    const [syncing,       setSyncing]       = useState(false);
     const [viewMode,      setViewMode]      = useState('attendance');
     const [activeClassId, setActiveClassId] = useState(null);
     const [targetDate,    setTargetDate]    = useState(getKSTDate());
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [sidebarOpen,   setSidebarOpen]   = useState(false);
+    const [showAddModal,      setShowAddModal]      = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
+    const [modalTargetClass,  setModalTargetClass]  = useState(null);
+    const [newStudentName,    setNewStudentName]     = useState('');
+    const [isDeleting,        setIsDeleting]         = useState(false);
+    const [toast,             setToast]              = useState(null);
+    const showToast = (message, type='success') => setToast({message, type});
 
-    const [showAddModal,       setShowAddModal]       = useState(false);
-    const [showDeleteConfirm,  setShowDeleteConfirm]  = useState(null);
-    const [modalTargetClass,   setModalTargetClass]   = useState(null);
-    const [newStudentName,     setNewStudentName]      = useState('');
-    const [isDeleting,         setIsDeleting]          = useState(false);
-
-    const [toast, setToast] = useState(null);
-    const showToast = (message, type = 'success') => setToast({ message, type });
-
-    // ── 데이터 로드 ────────────────────────────────────────
     const loadAll = useCallback(async () => {
-        setLoading(true);
-        setApiError(null);
+        setLoading(true); setApiError(null);
         try {
-            const [s, l] = await Promise.all([
-                api.get('getStudents'),
-                api.get('getLogs'),
-            ]);
+            const [s, l] = await Promise.all([api.get('getStudents'), api.get('getLogs')]);
             if (s.error) throw new Error(s.error);
             if (l.error) throw new Error(l.error);
             setStudents(Array.isArray(s) ? s : []);
             setLogs(Array.isArray(l) ? l : []);
-        } catch (err) {
-            setApiError('데이터를 불러오지 못했습니다. SCRIPT_URL을 확인해 주세요.\n' + err.message);
-        } finally {
-            setLoading(false);
-        }
+        } catch(err) { setApiError('데이터를 불러오지 못했습니다.\nSCRIPT_URL을 확인해 주세요.\n' + err.message); }
+        finally { setLoading(false); }
     }, []);
-
     useEffect(() => { loadAll(); }, []);
 
-    // ── 현재 요일 ─────────────────────────────────────────
     const currentDay = useMemo(() => {
         const days = ['일','월','화','수','목','금','토'];
         return days[parseLocalDate(targetDate).getDay()];
@@ -187,310 +425,179 @@ const App = () => {
     }, [currentDay]);
 
     const activeClass = ALL_CLASSES.find(c => c.id === activeClassId);
+    const getStatus   = sid => logs.find(l => l.StudentID === sid && l.Date === targetDate)?.Status;
 
-    // ── 출결 조회 ─────────────────────────────────────────
-    const getStatus = (studentId) =>
-        logs.find(l => l.StudentID === studentId && l.Date === targetDate)?.Status;
-
-    const getClassStats = (classId) => {
+    const getClassStats = classId => {
         const cls = students.filter(s => s.ClassID === classId);
-        let present = 0, absent = 0;
-        cls.forEach(s => {
-            const st = getStatus(s.ID);
-            if (st === 'PRESENT') present++;
-            else if (st === 'ABSENT') absent++;
-        });
-        return { total: cls.length, present, absent, unmarked: cls.length - present - absent };
+        let present=0, absent=0;
+        cls.forEach(s => { const st=getStatus(s.ID); if(st==='PRESENT')present++; else if(st==='ABSENT')absent++; });
+        return {total:cls.length, present, absent, unmarked:cls.length-present-absent};
     };
 
-    // ── 출결 저장 ─────────────────────────────────────────
     const handleAttendance = async (studentId, status) => {
-        // 낙관적 업데이트 (UI 즉시 반영)
         const logId = `${studentId}-${targetDate}`;
         setLogs(prev => {
-            const exists = prev.findIndex(l => l.LogID === logId);
-            const newLog = { LogID: logId, StudentID: studentId, Date: targetDate, Status: status, UpdatedAt: new Date().toISOString() };
-            if (exists >= 0) {
-                const updated = [...prev];
-                updated[exists] = newLog;
-                return updated;
-            }
+            const idx = prev.findIndex(l => l.LogID === logId);
+            const newLog = {LogID:logId, StudentID:studentId, Date:targetDate, Status:status, UpdatedAt:new Date().toISOString()};
+            if (idx >= 0) { const u=[...prev]; u[idx]=newLog; return u; }
             return [...prev, newLog];
         });
-
         setSyncing(true);
-        try {
-            await api.post({ action: 'setAttendance', studentId, date: targetDate, status });
-        } catch (err) {
-            showToast('저장 실패 — 네트워크를 확인해 주세요', 'error');
-            await loadAll(); // 실패 시 서버 상태로 복원
-        } finally {
-            setSyncing(false);
-        }
+        try { await api.post({action:'setAttendance', studentId, date:targetDate, status}); }
+        catch { showToast('저장 실패 — 네트워크를 확인해 주세요','error'); await loadAll(); }
+        finally { setSyncing(false); }
     };
 
-    // ── 학생 추가 ─────────────────────────────────────────
     const handleAddStudent = async () => {
         if (!newStudentName.trim()) return;
         try {
-            const res = await api.post({
-                action: 'addStudent',
-                name: newStudentName.trim(),
-                classId: modalTargetClass.id,
-            });
+            const res = await api.post({action:'addStudent', name:newStudentName.trim(), classId:modalTargetClass.id});
             if (res.error) throw new Error(res.error);
-            setNewStudentName('');
-            setShowAddModal(false);
             showToast(`${newStudentName.trim()} 학생이 등록되었습니다`);
-            await loadAll();
-        } catch (err) {
-            showToast('등록 실패: ' + err.message, 'error');
-        }
+            setNewStudentName(''); setShowAddModal(false); await loadAll();
+        } catch(err) { showToast('등록 실패: '+err.message,'error'); }
     };
 
-    // ── 학생 삭제 ─────────────────────────────────────────
-    const handleDeleteStudent = async (student) => {
+    const handleDeleteStudent = async student => {
         setIsDeleting(true);
         try {
-            const res = await api.post({ action: 'deleteStudent', id: student.ID });
+            const res = await api.post({action:'deleteStudent', id:student.ID});
             if (res.error) throw new Error(res.error);
-            setShowDeleteConfirm(null);
             showToast(`${student.Name} 학생이 삭제되었습니다`);
-            await loadAll();
-        } catch (err) {
-            showToast('삭제 실패: ' + err.message, 'error');
-        } finally {
-            setIsDeleting(false);
-        }
+            setShowDeleteConfirm(null); await loadAll();
+        } catch(err) { showToast('삭제 실패: '+err.message,'error'); }
+        finally { setIsDeleting(false); }
     };
 
-    // ── 에러 화면 ─────────────────────────────────────────
     if (apiError) return (
-        <div className="h-screen flex flex-col items-center justify-center bg-slate-50 p-8 text-center gap-4">
-            <div className="w-16 h-16 bg-rose-100 text-rose-500 rounded-full flex items-center justify-center">
-                <Icon name="alert" size={32} />
-            </div>
-            <h2 className="text-xl font-black text-slate-800">연결 오류</h2>
-            <p className="text-sm text-slate-500 max-w-sm leading-relaxed whitespace-pre-line">{apiError}</p>
-            <button onClick={loadAll} className="px-6 py-3 bg-slate-900 text-white rounded-2xl font-bold flex items-center gap-2">
-                <Icon name="refresh" size={16} /> 다시 시도
+        <div className="full-center">
+            <div className="error-icon"><Icon name="alert" size={32}/></div>
+            <div style={{fontSize:20,fontWeight:900,color:'#0f172a'}}>연결 오류</div>
+            <div style={{fontSize:13,color:'#64748b',maxWidth:320,lineHeight:1.7,whiteSpace:'pre-line'}}>{apiError}</div>
+            <button onClick={loadAll} style={{display:'flex',alignItems:'center',gap:8,padding:'12px 24px',background:'#0f172a',color:'#fff',borderRadius:16,fontSize:14,fontWeight:700,marginTop:8}}>
+                <Icon name="refresh" size={15}/> 다시 시도
             </button>
         </div>
     );
-
-    // ── 로딩 화면 ─────────────────────────────────────────
     if (loading) return (
-        <div className="h-screen flex flex-col items-center justify-center bg-slate-50 gap-4">
-            <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
-            <p className="font-bold text-slate-400">Google Sheets에서 불러오는 중...</p>
+        <div className="full-center">
+            <div className="spinner"/>
+            <div style={{fontWeight:700,color:'#94a3b8'}}>Google Sheets에서 불러오는 중...</div>
         </div>
     );
 
-    // ── 메인 레이아웃 ─────────────────────────────────────
     return (
-        <div className="min-h-screen bg-[#F5F6FA] flex flex-col md:flex-row h-screen overflow-hidden">
-
-            {/* 모바일 메뉴 오버레이 */}
-            {isSidebarOpen && (
-                <div className="md:hidden fixed inset-0 bg-slate-900/30 z-40 backdrop-blur-sm"
-                    onClick={() => setIsSidebarOpen(false)} />
-            )}
-
-            {/* 햄버거 버튼 */}
-            <button
-                onClick={() => setIsSidebarOpen(v => !v)}
-                className="md:hidden fixed top-4 right-4 z-[60] p-3 bg-slate-900 text-white rounded-2xl shadow-xl"
-            >
-                <Icon name={isSidebarOpen ? 'x' : 'menu'} size={22} />
+        <div className="app-shell">
+            <div className={`sidebar-overlay ${sidebarOpen?'open':''}`} onClick={() => setSidebarOpen(false)}/>
+            <button className="mobile-menu-btn" onClick={() => setSidebarOpen(v=>!v)}>
+                <Icon name={sidebarOpen?'x':'menu'} size={22}/>
             </button>
 
-            {/* ── 사이드바 ───────────────────────────────── */}
-            <aside className={`
-                fixed inset-y-0 left-0 w-68 bg-white border-r border-slate-100 flex flex-col p-6 z-50 transition-transform duration-300 shadow-sm
-                ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 md:static md:w-64
-            `}>
-                {/* 로고 */}
-                <div className="flex items-center gap-3 mb-10 mt-4 md:mt-0 px-1">
-                    <div className="w-11 h-11 bg-slate-900 rounded-xl flex items-center justify-center text-orange-400 shadow-lg -rotate-3 shrink-0">
-                        <Icon name="sparkles" size={22} />
-                    </div>
-                    <div>
-                        <h1 className="text-base font-black text-slate-900 leading-none">군위몰입수학</h1>
-                        <span className="text-[9px] text-orange-500 font-black uppercase tracking-widest mt-1 block">출결관리 시스템</span>
-                    </div>
+            <aside className={`sidebar ${sidebarOpen?'open':''}`}>
+                <div className="sidebar-logo">
+                    <div className="logo-icon"><Icon name="sparkles" size={22}/></div>
+                    <div><div className="logo-title">군위몰입수학</div><div className="logo-sub">출결관리 시스템</div></div>
                 </div>
-
-                {/* 네비 */}
-                <nav className="space-y-1.5 flex-1">
+                <nav className="nav">
                     {[
-                        { id: 'attendance', label: '출결 체크',   icon: 'user-check', active: 'bg-orange-500' },
-                        { id: 'manage',     label: '학생 관리',   icon: 'settings',   active: 'bg-slate-900' },
-                        { id: 'report',     label: '출결 리포트', icon: 'file-text',  active: 'bg-indigo-600' },
+                        {id:'attendance',label:'출결 체크',  icon:'user-check',active:'active-orange'},
+                        {id:'manage',    label:'학생 관리',  icon:'settings',  active:'active-dark'},
+                        {id:'report',    label:'출결 리포트',icon:'file-text', active:'active-indigo'},
                     ].map(btn => (
-                        <button key={btn.id}
-                            onClick={() => { setViewMode(btn.id); setActiveClassId(null); setIsSidebarOpen(false); }}
-                            className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-sm font-black transition-all
-                                ${viewMode === btn.id
-                                    ? btn.active + ' text-white shadow-md'
-                                    : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'}`}
-                        >
-                            <Icon name={btn.icon} size={17} /> {btn.label}
+                        <button key={btn.id} className={`nav-btn ${viewMode===btn.id?btn.active:''}`}
+                            onClick={() => {setViewMode(btn.id); setActiveClassId(null); setSidebarOpen(false);}}>
+                            <Icon name={btn.icon} size={17}/> {btn.label}
                         </button>
                     ))}
                 </nav>
-
-                {/* 새로고침 + 싱크 표시 */}
-                <button onClick={loadAll}
-                    className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-xs font-bold text-slate-400 hover:bg-slate-50 transition-all">
-                    <Icon name="refresh" size={14} className={syncing ? 'animate-spin text-orange-400' : ''} />
-                    {syncing ? '동기화 중...' : '새로고침'}
-                </button>
-
-                {/* DB 표시 */}
-                <div className="mt-2 px-4 py-3 rounded-2xl bg-slate-50 border border-slate-100">
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Database</p>
-                    <p className="text-[11px] font-bold text-slate-500 truncate">Google Sheets</p>
-                    <p className="text-[10px] text-slate-400 mt-0.5">학생 {students.length}명 · 로그 {logs.length}건</p>
+                <div className="sidebar-footer">
+                    <button className="refresh-btn" onClick={loadAll}>
+                        <Icon name="refresh" size={14} cls={syncing?'spin':''}/>
+                        {syncing ? '동기화 중...' : '새로고침'}
+                    </button>
+                    <div className="db-card">
+                        <div className="db-card-label">Database</div>
+                        <div className="db-card-val">Google Sheets</div>
+                        <div className="db-card-sub">학생 {students.length}명 · 로그 {logs.length}건</div>
+                    </div>
                 </div>
             </aside>
 
-            {/* ── 메인 콘텐츠 ───────────────────────────── */}
-            <main className="flex-1 overflow-y-auto p-5 md:p-9 pt-20 md:pt-9">
-
-                {/* 헤더 */}
-                <header className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 mb-8">
+            <main className="main">
+                <div className="main-header">
                     <div>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">
-                            {viewMode === 'report' ? 'History' : 'Admin Panel'}
-                        </p>
-                        <h2 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">
-                            {viewMode === 'manage' ? '전체 분반 현황'
-                                : viewMode === 'report' ? '전체 출결 기록'
-                                : activeClassId ? activeClass?.name
-                                : '학생 출결 관리'}
-                        </h2>
+                        <div className="header-eyebrow">{viewMode==='report'?'History':'Admin Panel'}</div>
+                        <div className="header-title">
+                            {viewMode==='manage'?'전체 분반 현황':viewMode==='report'?'전체 출결 기록':activeClassId?activeClass?.name:'학생 출결 관리'}
+                        </div>
                     </div>
-
                     {viewMode !== 'report' && (
-                        <div className="flex items-center gap-3 bg-white px-5 py-3 rounded-2xl border border-slate-100 shadow-sm self-start">
-                            <input type="date" value={targetDate}
-                                onChange={e => { setTargetDate(e.target.value); setActiveClassId(null); }}
-                                className="text-sm font-black text-slate-600 outline-none bg-transparent" />
-                            <div className="w-px h-4 bg-slate-200" />
-                            <span className="text-sm font-black text-orange-500">{currentDay}요일</span>
+                        <div className="date-picker-bar">
+                            <input type="date" value={targetDate} onChange={e => {setTargetDate(e.target.value); setActiveClassId(null);}}/>
+                            <div className="date-divider"/>
+                            <span className="day-badge">{currentDay}요일</span>
                         </div>
                     )}
-                </header>
+                </div>
 
-                {/* ════════════════════════════════════════
-                    출결 체크 뷰
-                ════════════════════════════════════════ */}
+                {/* 출결 체크 */}
                 {viewMode === 'attendance' && (
                     <div className="fade-in">
                         {!activeClassId ? (
-                            // 분반 목록
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid-2">
                                 {filteredClasses.length > 0 ? filteredClasses.map(c => {
-                                    const th = GRADE_THEMES[c.grade];
-                                    const st = getClassStats(c.id);
-                                    const pct = st.total > 0 ? Math.round((st.present / st.total) * 100) : 0;
+                                    const gc  = GRADE_CSS[c.grade];
+                                    const st  = getClassStats(c.id);
+                                    const pct = st.total > 0 ? Math.round(st.present/st.total*100) : 0;
                                     return (
-                                        <button key={c.id} onClick={() => setActiveClassId(c.id)}
-                                            className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all text-left flex flex-col gap-4 group">
-                                            <div className="flex items-center justify-between">
-                                                <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg ${th.accent} text-white`}>{c.grade}</span>
-                                                {st.unmarked > 0 && (
-                                                    <span className="text-[10px] font-black px-2.5 py-1 rounded-lg bg-amber-100 text-amber-600 animate-pulse">
-                                                        미체크 {st.unmarked}명
-                                                    </span>
-                                                )}
+                                        <button key={c.id} className="class-card" onClick={() => setActiveClassId(c.id)}>
+                                            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                                                <span className={`grade-badge ${gc}a`}>{c.grade}</span>
+                                                {st.unmarked > 0 && <span className="unmarked-badge">미체크 {st.unmarked}명</span>}
                                             </div>
-                                            <h4 className="text-xl font-black text-slate-900">{c.name}</h4>
-
-                                            {/* 출석률 바 */}
-                                            <div className="w-full">
-                                                <div className="flex justify-between text-[10px] font-black text-slate-400 mb-1.5">
-                                                    <span>출석률</span><span>{pct}%</span>
-                                                </div>
-                                                <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                                                    <div className="h-full bg-emerald-400 rounded-full transition-all duration-500"
-                                                        style={{ width: `${pct}%` }} />
-                                                </div>
+                                            <div className="class-card-name">{c.name}</div>
+                                            <div>
+                                                <div className="pct-row"><span>출석률</span><span>{pct}%</span></div>
+                                                <div className="pct-bar"><div className="pct-fill" style={{width:`${pct}%`}}/></div>
                                             </div>
-
-                                            <div className="grid grid-cols-3 gap-2">
-                                                {[
-                                                    { label: '등록', val: st.total,   cls: 'bg-slate-50 text-slate-600' },
-                                                    { label: '출석', val: st.present, cls: 'bg-emerald-50 text-emerald-600' },
-                                                    { label: '결석', val: st.absent,  cls: 'bg-rose-50 text-rose-600' },
-                                                ].map(item => (
-                                                    <div key={item.label} className={`${item.cls} p-3 rounded-xl flex flex-col items-center`}>
-                                                        <span className="text-[9px] font-black opacity-60">{item.label}</span>
-                                                        <span className="font-black text-lg leading-tight">{item.val}</span>
+                                            <div className="class-stats">
+                                                {[{label:'등록',val:st.total,bg:'#f8fafc',color:'#475569'},{label:'출석',val:st.present,bg:'#ecfdf5',color:'#059669'},{label:'결석',val:st.absent,bg:'#fef2f2',color:'#dc2626'}].map(item => (
+                                                    <div key={item.label} className="class-stat-box" style={{background:item.bg}}>
+                                                        <div className="class-stat-lbl" style={{color:item.color,opacity:.7}}>{item.label}</div>
+                                                        <div className="class-stat-val" style={{color:item.color}}>{item.val}</div>
                                                     </div>
                                                 ))}
                                             </div>
                                         </button>
                                     );
                                 }) : (
-                                    <div className="col-span-full py-40 bg-white rounded-[2rem] border border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-300">
-                                        <Icon name="calendar" size={48} className="mb-4 opacity-30" />
-                                        <p className="font-bold text-lg">오늘은 수업이 없습니다</p>
-                                        <p className="text-sm mt-1">월·화·목·금요일에 수업이 있습니다</p>
+                                    <div className="empty-box" style={{gridColumn:'1/-1'}}>
+                                        <Icon name="calendar" size={48} style={{opacity:.2}}/>
+                                        <p>오늘은 수업이 없습니다</p><span>월·화·목·금요일에 수업이 있습니다</span>
                                     </div>
                                 )}
                             </div>
                         ) : (
-                            // 학생 출결 체크
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-3 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm sticky top-0 z-10">
-                                    <button onClick={() => setActiveClassId(null)}
-                                        className="p-2 text-slate-400 hover:bg-slate-50 rounded-xl transition-colors">
-                                        <Icon name="chevron-left" size={20} />
-                                    </button>
-                                    <h3 className="font-black text-slate-800">{activeClass?.name}</h3>
-                                    <div className="ml-auto flex items-center gap-2 text-xs text-slate-400 font-bold">
-                                        {syncing && <><span className="w-3 h-3 border-2 border-orange-400 border-t-transparent rounded-full animate-spin inline-block"></span> 저장 중</>}
-                                    </div>
+                            <div>
+                                <div className="sticky-bar">
+                                    <button className="back-btn" onClick={() => setActiveClassId(null)}><Icon name="chevron-l" size={20}/></button>
+                                    <span className="sticky-title">{activeClass?.name}</span>
+                                    {syncing && <div className="sync-indicator"><span style={{width:12,height:12,border:'2px solid #fb923c',borderTopColor:'transparent',borderRadius:'50%',display:'inline-block',animation:'spin .8s linear infinite'}}/> 저장 중</div>}
                                 </div>
-
                                 {students.filter(s => s.ClassID === activeClassId).length === 0 ? (
-                                    <div className="py-24 bg-white rounded-[2rem] border border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-300">
-                                        <p className="font-bold">등록된 학생이 없습니다</p>
-                                        <p className="text-sm mt-1">학생 관리에서 추가해 주세요</p>
-                                    </div>
+                                    <div className="empty-box"><p>등록된 학생이 없습니다</p><span>학생 관리에서 추가해 주세요</span></div>
                                 ) : (
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-20">
+                                    <div className="att-grid" style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:16,paddingBottom:80}}>
                                         {students.filter(s => s.ClassID === activeClassId).map(student => {
                                             const status = getStatus(student.ID);
+                                            const sc = status==='PRESENT'?'present':status==='ABSENT'?'absent':'';
                                             return (
-                                                <div key={student.ID}
-                                                    className={`bg-white p-6 rounded-[2rem] border-2 transition-all flex flex-col items-center text-center
-                                                        ${status === 'PRESENT' ? 'border-emerald-200'
-                                                        : status === 'ABSENT'  ? 'border-rose-200'
-                                                        : 'border-amber-100'}`}>
-                                                    <div className={`w-12 h-12 rounded-full mb-4 flex items-center justify-center text-lg font-black
-                                                        ${status === 'PRESENT' ? 'bg-emerald-100 text-emerald-600'
-                                                        : status === 'ABSENT'  ? 'bg-rose-100 text-rose-600'
-                                                        : 'bg-slate-100 text-slate-400'}`}>
-                                                        {student.Name?.[0]}
-                                                    </div>
-                                                    <h4 className="font-black text-slate-800 mb-5">{student.Name}</h4>
-                                                    <div className="flex gap-2 w-full">
-                                                        <button onClick={() => handleAttendance(student.ID, 'PRESENT')}
-                                                            className={`flex-1 py-3 rounded-xl text-xs font-black transition-all
-                                                                ${status === 'PRESENT'
-                                                                    ? 'bg-emerald-500 text-white shadow-md'
-                                                                    : 'bg-slate-50 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600'}`}>
-                                                            출석
-                                                        </button>
-                                                        <button onClick={() => handleAttendance(student.ID, 'ABSENT')}
-                                                            className={`flex-1 py-3 rounded-xl text-xs font-black transition-all
-                                                                ${status === 'ABSENT'
-                                                                    ? 'bg-rose-500 text-white shadow-md'
-                                                                    : 'bg-slate-50 text-slate-400 hover:bg-rose-50 hover:text-rose-600'}`}>
-                                                            결석
-                                                        </button>
+                                                <div key={student.ID} className={`att-card ${sc}`}>
+                                                    <div className={`att-avatar ${sc}`}>{student.Name?.[0]}</div>
+                                                    <div className="att-name">{student.Name}</div>
+                                                    <div className="att-btns">
+                                                        <button className={`att-btn btn-present ${status==='PRESENT'?'active':''}`} onClick={() => handleAttendance(student.ID,'PRESENT')}>출석</button>
+                                                        <button className={`att-btn btn-absent  ${status==='ABSENT' ?'active':''}`} onClick={() => handleAttendance(student.ID,'ABSENT')}>결석</button>
                                                     </div>
                                                 </div>
                                             );
@@ -502,48 +609,33 @@ const App = () => {
                     </div>
                 )}
 
-                {/* ════════════════════════════════════════
-                    학생 관리 뷰
-                ════════════════════════════════════════ */}
+                {/* 학생 관리 */}
                 {viewMode === 'manage' && (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-20 fade-in">
-                        {Object.keys(GRADE_THEMES).map(grade => {
-                            const th = GRADE_THEMES[grade];
+                    <div className="fade-in grid-2" style={{paddingBottom:80}}>
+                        {GRADE_KEYS.map(grade => {
+                            const gc = GRADE_CSS[grade];
                             return (
-                                <div key={grade} className={`p-6 rounded-[2.5rem] border ${th.border} ${th.bg}`}>
-                                    <h4 className={`text-xl font-black ${th.text} mb-5 flex items-center gap-2`}>
-                                        <Icon name="graduation" size={20} /> {grade}
-                                    </h4>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div key={grade} className={`grade-section ${gc}`}>
+                                    <div className={`grade-title ${gc}t`}><Icon name="graduation" size={20}/> {grade}</div>
+                                    <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:12}}>
                                         {ALL_CLASSES.filter(c => c.grade === grade).map(c => {
-                                            const classStudents = students.filter(s => s.ClassID === c.id);
+                                            const cs = students.filter(s => s.ClassID === c.id);
                                             return (
-                                                <div key={c.id} className="bg-white p-5 rounded-3xl shadow-sm border border-white/80 flex flex-col">
-                                                    <div className="flex justify-between items-start mb-4">
-                                                        <div>
-                                                            <h5 className="text-xs font-black text-slate-800">{c.name}</h5>
-                                                            <p className="text-[10px] text-slate-400 font-bold mt-0.5">{classStudents.length}명</p>
-                                                        </div>
-                                                        <button
-                                                            onClick={() => { setModalTargetClass(c); setShowAddModal(true); }}
-                                                            className="p-2 bg-slate-900 text-white rounded-xl hover:bg-slate-700 transition-colors">
-                                                            <Icon name="user-plus" size={13} />
+                                                <div key={c.id} className="manage-class-card">
+                                                    <div className="manage-class-header">
+                                                        <div><div className="manage-class-name">{c.name}</div><div className="manage-class-count">{cs.length}명</div></div>
+                                                        <button className="add-btn" onClick={() => {setModalTargetClass(c); setShowAddModal(true);}}>
+                                                            <Icon name="user-plus" size={13}/>
                                                         </button>
                                                     </div>
-                                                    <div className="flex flex-wrap gap-1.5">
-                                                        {classStudents.map(s => (
-                                                            <div key={s.ID}
-                                                                className="flex items-center gap-1 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100">
-                                                                <span className="text-[11px] font-bold text-slate-600">{s.Name}</span>
-                                                                <button onClick={() => setShowDeleteConfirm(s)}
-                                                                    className="text-slate-300 hover:text-rose-500 transition-colors ml-0.5">
-                                                                    <Icon name="x" size={10} />
-                                                                </button>
+                                                    <div className="student-tags">
+                                                        {cs.map(s => (
+                                                            <div key={s.ID} className="student-tag">
+                                                                <span className="student-tag-name">{s.Name}</span>
+                                                                <button className="student-tag-del" onClick={() => setShowDeleteConfirm(s)}><Icon name="x" size={10}/></button>
                                                             </div>
                                                         ))}
-                                                        {classStudents.length === 0 && (
-                                                            <p className="text-[11px] text-slate-300 font-bold py-1">학생 없음</p>
-                                                        )}
+                                                        {cs.length === 0 && <span style={{fontSize:11,color:'#cbd5e1',fontWeight:700}}>학생 없음</span>}
                                                     </div>
                                                 </div>
                                             );
@@ -555,128 +647,51 @@ const App = () => {
                     </div>
                 )}
 
-                {/* ════════════════════════════════════════
-                    출결 리포트 뷰
-                ════════════════════════════════════════ */}
-                {viewMode === 'report' && (
-                    <div className="fade-in pb-10 space-y-6">
-                        {/* 요약 카드 */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            {[
-                                { label: '전체 로그',  val: logs.length,                                        cls: 'text-slate-700' },
-                                { label: '출석',       val: logs.filter(l=>l.Status==='PRESENT').length,        cls: 'text-emerald-600' },
-                                { label: '결석',       val: logs.filter(l=>l.Status==='ABSENT').length,         cls: 'text-rose-600' },
-                                { label: '등록 학생',  val: students.length,                                    cls: 'text-indigo-600' },
-                            ].map(item => (
-                                <div key={item.label} className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{item.label}</p>
-                                    <p className={`text-3xl font-black mt-1 ${item.cls}`}>{item.val}</p>
-                                </div>
-                            ))}
-                        </div>
-
-                        {/* 로그 테이블 */}
-                        <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left">
-                                    <thead>
-                                        <tr className="bg-slate-50 border-b border-slate-100">
-                                            {['날짜','학생명','반','상태','기록시각'].map(h => (
-                                                <th key={h} className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
-                                            ))}
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-50">
-                                        {logs.length === 0 ? (
-                                            <tr><td colSpan={5} className="px-6 py-16 text-center text-slate-300 font-bold">출결 기록이 없습니다</td></tr>
-                                        ) : logs.map(log => {
-                                            const student = students.find(s => s.ID === log.StudentID);
-                                            const cls = student ? ALL_CLASSES.find(c => c.id === student.ClassID) : null;
-                                            return (
-                                                <tr key={log.LogID} className="hover:bg-slate-50/60 transition-colors">
-                                                    <td className="px-6 py-4 text-[11px] font-bold text-slate-400 whitespace-nowrap">{log.Date}</td>
-                                                    <td className="px-6 py-4 text-xs font-black text-slate-800">{student?.Name || '—'}</td>
-                                                    <td className="px-6 py-4 text-[11px] font-bold text-slate-500 whitespace-nowrap">{cls?.name || '—'}</td>
-                                                    <td className="px-6 py-4">
-                                                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-black ${
-                                                            log.Status === 'PRESENT'
-                                                                ? 'bg-emerald-50 text-emerald-600'
-                                                                : 'bg-rose-50 text-rose-600'}`}>
-                                                            {log.Status === 'PRESENT' ? '출석' : '결석'}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-6 py-4 text-[11px] text-slate-300 font-bold whitespace-nowrap">
-                                                        {log.UpdatedAt ? new Date(log.UpdatedAt).toLocaleString('ko-KR') : '—'}
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                )}
+                {/* 리포트 */}
+                {viewMode === 'report' && <ReportView logs={logs} students={students}/>}
             </main>
 
-            {/* ── 학생 등록 모달 ─────────────────────────── */}
+            {/* 등록 모달 */}
             {showAddModal && (
-                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-end sm:items-center justify-center p-4">
-                    <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl scale-in">
-                        <h3 className="text-xl font-black text-slate-900 text-center mb-1">학생 등록</h3>
-                        <p className="text-xs text-center text-slate-400 font-bold mb-7">{modalTargetClass?.name}</p>
-                        <input autoFocus type="text" placeholder="이름을 입력하세요"
-                            value={newStudentName}
-                            onChange={e => setNewStudentName(e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && handleAddStudent()}
-                            className="w-full bg-slate-50 border-2 border-transparent focus:border-orange-400 rounded-2xl px-5 py-4 font-bold outline-none transition-colors mb-5" />
-                        <div className="flex gap-2">
-                            <button onClick={() => { setShowAddModal(false); setNewStudentName(''); }}
-                                className="flex-1 py-4 font-black text-slate-400 bg-slate-50 rounded-2xl hover:bg-slate-100 transition-colors">
-                                취소
-                            </button>
-                            <button onClick={handleAddStudent}
-                                className="flex-1 py-4 font-black text-white bg-slate-900 rounded-2xl hover:bg-slate-700 transition-colors">
-                                등록
-                            </button>
+                <div className="modal-overlay" onClick={e => e.target===e.currentTarget && (setShowAddModal(false),setNewStudentName(''))}>
+                    <div className="modal-box">
+                        <div className="modal-title">학생 등록</div>
+                        <div className="modal-sub">{modalTargetClass?.name}</div>
+                        <input autoFocus className="modal-input" type="text" placeholder="이름을 입력하세요"
+                            value={newStudentName} onChange={e => setNewStudentName(e.target.value)}
+                            onKeyDown={e => e.key==='Enter' && handleAddStudent()}/>
+                        <div className="modal-btns">
+                            <button className="btn-cancel" onClick={() => {setShowAddModal(false); setNewStudentName('');}}>취소</button>
+                            <button className="btn-confirm" onClick={handleAddStudent}>등록</button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* ── 삭제 확인 모달 ─────────────────────────── */}
+            {/* 삭제 모달 */}
             {showDeleteConfirm && (
-                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-end sm:items-center justify-center p-4">
-                    <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl scale-in text-center">
-                        <div className="w-14 h-14 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-5">
-                            <Icon name="trash" size={24} className="text-rose-500" />
-                        </div>
-                        <h3 className="text-xl font-black text-slate-900 mb-2">학생 삭제</h3>
-                        <p className="text-sm font-bold text-slate-500 mb-1">{showDeleteConfirm.Name}</p>
-                        <p className="text-xs text-rose-400 font-bold mb-8">출결 기록도 함께 삭제되며 복구할 수 없습니다.</p>
-                        <div className="flex gap-2">
-                            <button onClick={() => setShowDeleteConfirm(null)} disabled={isDeleting}
-                                className="flex-1 py-4 font-black text-slate-400 bg-slate-50 rounded-2xl disabled:opacity-50">
-                                취소
-                            </button>
-                            <button onClick={() => handleDeleteStudent(showDeleteConfirm)} disabled={isDeleting}
-                                className="flex-1 py-4 font-black text-white bg-rose-500 rounded-2xl disabled:opacity-60 flex items-center justify-center gap-2">
-                                {isDeleting
-                                    ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> 삭제 중</>
-                                    : '삭제'}
+                <div className="modal-overlay" onClick={e => e.target===e.currentTarget && !isDeleting && setShowDeleteConfirm(null)}>
+                    <div className="modal-box" style={{textAlign:'center'}}>
+                        <div className="delete-icon-wrap"><Icon name="trash" size={24} style={{color:'#ef4444'}}/></div>
+                        <div className="modal-title">학생 삭제</div>
+                        <div style={{fontSize:14,fontWeight:700,color:'#64748b',marginBottom:6}}>{showDeleteConfirm.Name}</div>
+                        <div style={{fontSize:12,color:'#ef4444',fontWeight:700,marginBottom:28}}>출결 기록도 함께 삭제되며 복구할 수 없습니다.</div>
+                        <div className="modal-btns">
+                            <button className="btn-cancel" onClick={() => setShowDeleteConfirm(null)} disabled={isDeleting}>취소</button>
+                            <button className="btn-danger" onClick={() => handleDeleteStudent(showDeleteConfirm)} disabled={isDeleting}>
+                                {isDeleting ? <><span style={{width:16,height:16,border:'2px solid #fff',borderTopColor:'transparent',borderRadius:'50%',display:'inline-block',animation:'spin .8s linear infinite'}}/> 삭제 중</> : '삭제'}
                             </button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* ── 토스트 알림 ────────────────────────────── */}
-            {toast && <Toast {...toast} onDone={() => setToast(null)} />}
+            {toast && <Toast {...toast} onDone={() => setToast(null)}/>}
         </div>
     );
 };
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
 </body>
 </html>
