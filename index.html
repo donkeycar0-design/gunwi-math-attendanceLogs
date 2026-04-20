@@ -268,10 +268,16 @@ const ALL_CLASSES = (() => {
     [1,2,3,4,5,6].forEach(g => {
         const grade = `${g}학년`;
         out.push(
-            {id:`e${g}-mw-s`,name:`초등 ${g} 월목 (수업)`,grade,days:'월목'},
-            {id:`e${g}-mw-h`,name:`초등 ${g} 월목 (학습)`,grade,days:'월목'},
-            {id:`e${g}-hg-s`,name:`초등 ${g} 화금 (수업)`,grade,days:'화금'},
-            {id:`e${g}-hg-h`,name:`초등 ${g} 화금 (학습)`,grade,days:'화금'},
+            // 기존 반
+            {id:`e${g}-mw-s`, name:`초등 ${g} 월목 (수업)`, grade, days:'월목', extra:false},
+            {id:`e${g}-mw-h`, name:`초등 ${g} 월목 (학습)`, grade, days:'월목', extra:false},
+            {id:`e${g}-hg-s`, name:`초등 ${g} 화금 (수업)`, grade, days:'화금', extra:false},
+            {id:`e${g}-hg-h`, name:`초등 ${g} 화금 (학습)`, grade, days:'화금', extra:false},
+            // 추가 반
+            {id:`e${g}-mw-xs`, name:`초등 ${g} 월목 추가 (수업)`, grade, days:'월목', extra:true},
+            {id:`e${g}-mw-xh`, name:`초등 ${g} 월목 추가 (학습)`, grade, days:'월목', extra:true},
+            {id:`e${g}-hg-xs`, name:`초등 ${g} 화금 추가 (수업)`, grade, days:'화금', extra:true},
+            {id:`e${g}-hg-xh`, name:`초등 ${g} 화금 추가 (학습)`, grade, days:'화금', extra:true},
         );
     });
     return out;
@@ -391,6 +397,8 @@ const App = () => {
     const [viewMode,      setViewMode]      = useState('attendance');
     const [activeClassId, setActiveClassId] = useState(null);
     const [targetDate,    setTargetDate]    = useState(getKSTDate());
+    const [activeGrade,   setActiveGrade]   = useState(null);
+    const [activeDays,    setActiveDays]    = useState(null);
     const [sidebarOpen,   setSidebarOpen]   = useState(false);
     const [showAddModal,      setShowAddModal]      = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
@@ -520,6 +528,13 @@ const App = () => {
                         <div className="db-card-val">Google Sheets</div>
                         <div className="db-card-sub">학생 {students.length}명 · 로그 {logs.length}건</div>
                     </div>
+
+                    {/* 제작사 표기 */}
+                    <div style={{marginTop:12,paddingTop:12,borderTop:'1px solid #f1f5f9'}}>
+                        <div style={{fontSize:9,fontWeight:900,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'.1em',marginBottom:4}}>제작</div>
+                        <div style={{fontSize:12,fontWeight:900,color:'#64748b'}}>티치포퓨터</div>
+                        <div style={{fontSize:11,fontWeight:700,color:'#94a3b8',marginTop:2}}>바이브코딩 연구소</div>
+                    </div>
                 </div>
             </aside>
 
@@ -544,44 +559,126 @@ const App = () => {
                 {viewMode === 'attendance' && (
                     <div className="fade-in">
                         {!activeClassId ? (
-                            <div className="grid-2">
-                                {filteredClasses.length > 0 ? filteredClasses.map(c => {
-                                    const gc  = GRADE_CSS[c.grade];
-                                    const st  = getClassStats(c.id);
-                                    const pct = st.total > 0 ? Math.round(st.present/st.total*100) : 0;
-                                    return (
-                                        <button key={c.id} className="class-card" onClick={() => setActiveClassId(c.id)}>
-                                            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                                                <span className={`grade-badge ${gc}a`}>{c.grade}</span>
-                                                {st.unmarked > 0 && <span className="unmarked-badge">미체크 {st.unmarked}명</span>}
-                                            </div>
-                                            <div className="class-card-name">{c.name}</div>
-                                            <div>
-                                                <div className="pct-row"><span>출석률</span><span>{pct}%</span></div>
-                                                <div className="pct-bar"><div className="pct-fill" style={{width:`${pct}%`}}/></div>
-                                            </div>
-                                            <div className="class-stats">
-                                                {[{label:'등록',val:st.total,bg:'#f8fafc',color:'#475569'},{label:'출석',val:st.present,bg:'#ecfdf5',color:'#059669'},{label:'결석',val:st.absent,bg:'#fef2f2',color:'#dc2626'}].map(item => (
-                                                    <div key={item.label} className="class-stat-box" style={{background:item.bg}}>
-                                                        <div className="class-stat-lbl" style={{color:item.color,opacity:.7}}>{item.label}</div>
-                                                        <div className="class-stat-val" style={{color:item.color}}>{item.val}</div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </button>
+                            /* ── 요일 필터 적용된 학년별 반 카드 목록 ── */
+                            ['월','목'].includes(currentDay) || ['화','금'].includes(currentDay) ? (
+                            <div style={{display:'flex',flexDirection:'column',gap:24,paddingBottom:40}}>
+                                {/* 전체 학년 통틀어 등록된 반이 하나도 없으면 안내 */}
+                                {(() => {
+                                    const dayFilter = ['월','목'].includes(currentDay) ? '월목' : '화금';
+                                    const hasAny = ALL_CLASSES.some(c => c.days === dayFilter && getClassStats(c.id).total > 0);
+                                    if (!hasAny) return (
+                                        <div className="empty-box">
+                                            <Icon name="user-plus" size={40} style={{opacity:.25}}/>
+                                            <p>등록된 학생이 없습니다</p>
+                                            <span>학생 관리 탭에서 학생을 먼저 추가해 주세요</span>
+                                        </div>
                                     );
-                                }) : (
-                                    <div className="empty-box" style={{gridColumn:'1/-1'}}>
-                                        <Icon name="calendar" size={48} style={{opacity:.2}}/>
-                                        <p>오늘은 수업이 없습니다</p><span>월·화·목·금요일에 수업이 있습니다</span>
-                                    </div>
-                                )}
+                                    return null;
+                                })()}
+                                {GRADE_KEYS.map(grade => {
+                                    const gc = GRADE_CSS[grade];
+                                    const dayFilter = ['월','목'].includes(currentDay) ? '월목' : '화금';
+                                    // 기존반 / 추가반 분리
+                                    // 학생이 1명 이상 등록된 반만 표시
+                                    const normalClasses = ALL_CLASSES.filter(c => c.grade === grade && c.days === dayFilter && !c.extra && getClassStats(c.id).total > 0);
+                                    const extraClasses  = ALL_CLASSES.filter(c => c.grade === grade && c.days === dayFilter &&  c.extra && getClassStats(c.id).total > 0);
+                                    const allGradeClasses = [...normalClasses, ...extraClasses];
+                                    const totalUnmarked = allGradeClasses.reduce((sum, c) => sum + getClassStats(c.id).unmarked, 0);
+                                    // 이 학년에 표시할 반이 없으면 학년 섹션 자체를 숨김
+                                    if (allGradeClasses.length === 0) return null;
+
+                                    // 반 카드 렌더 함수
+                                    const renderClassCard = (c) => {
+                                        const st  = getClassStats(c.id);
+                                        const pct = st.total > 0 ? Math.round(st.present/st.total*100) : 0;
+                                        const typeLabel = (c.id.endsWith('-s') || c.id.endsWith('-xs')) ? '수반' : '학반';
+                                        const isExtra   = c.extra;
+                                        return (
+                                            <button key={c.id} className="class-card" style={{gap:12,padding:20,border: isExtra ? '2px solid #e0e7ff' : '1px solid #f1f5f9'}} onClick={() => setActiveClassId(c.id)}>
+                                                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                                                    <div style={{display:'flex',alignItems:'center',gap:6}}>
+                                                        {isExtra && <span style={{fontSize:9,fontWeight:900,padding:'2px 6px',borderRadius:6,background:'#6366f1',color:'#fff'}}>추가</span>}
+                                                        <span style={{fontSize:13,fontWeight:900,color:'#0f172a'}}>{typeLabel}</span>
+                                                    </div>
+                                                    {st.unmarked > 0 && <span className="unmarked-badge" style={{fontSize:9,padding:'2px 7px'}}>미체크 {st.unmarked}</span>}
+                                                </div>
+                                                <div>
+                                                    <div className="pct-row"><span>출석률</span><span>{pct}%</span></div>
+                                                    <div className="pct-bar"><div className="pct-fill" style={{width:`${pct}%`}}/></div>
+                                                </div>
+                                                <div className="class-stats">
+                                                    {[{label:'등록',val:st.total,bg:'#f8fafc',color:'#475569'},{label:'출석',val:st.present,bg:'#ecfdf5',color:'#059669'},{label:'결석',val:st.absent,bg:'#fef2f2',color:'#dc2626'}].map(item => (
+                                                        <div key={item.label} className="class-stat-box" style={{background:item.bg}}>
+                                                            <div className="class-stat-lbl" style={{color:item.color,opacity:.7}}>{item.label}</div>
+                                                            <div className="class-stat-val" style={{color:item.color,fontSize:16}}>{item.val}</div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </button>
+                                        );
+                                    };
+
+                                    return (
+                                        <div key={grade}>
+                                            {/* 학년 헤더 */}
+                                            <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12}}>
+                                                <span className={`grade-badge ${gc}a`} style={{fontSize:13,padding:'5px 14px'}}>{grade}</span>
+                                                {totalUnmarked > 0 && <span className="unmarked-badge">전체 미체크 {totalUnmarked}명</span>}
+                                            </div>
+
+                                            {/* 기존반 (수반 | 학반) */}
+                                            <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:12,marginBottom: extraClasses.length > 0 ? 10 : 0}}>
+                                                {normalClasses.map(renderClassCard)}
+                                            </div>
+
+                                            {/* 추가반 (있을 때만) */}
+                                            {extraClasses.length > 0 && (
+                                                <>
+                                                    <div style={{display:'flex',alignItems:'center',gap:8,margin:'10px 0 8px'}}>
+                                                        <div style={{flex:1,height:1,background:'#e0e7ff'}}/>
+                                                        <span style={{fontSize:10,fontWeight:900,color:'#6366f1',padding:'2px 10px',background:'#eef2ff',borderRadius:99}}>추가반</span>
+                                                        <div style={{flex:1,height:1,background:'#e0e7ff'}}/>
+                                                    </div>
+                                                    <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:12}}>
+                                                        {extraClasses.map(renderClassCard)}
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+                                    );
+                                })}
                             </div>
+                            ) : (
+                            /* ── 수업 없는 날 안내 ── */
+                            <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'80px 24px',gap:20,textAlign:'center'}}>
+                                <div style={{width:80,height:80,borderRadius:'50%',background:'#f1f5f9',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                                    <Icon name="calendar" size={40} style={{color:'#cbd5e1'}}/>
+                                </div>
+                                <div>
+                                    <div style={{fontSize:20,fontWeight:900,color:'#94a3b8',marginBottom:8}}>
+                                        금일 군위몰입수학 수업이 없습니다
+                                    </div>
+                                    <div style={{fontSize:14,fontWeight:700,color:'#cbd5e1'}}>
+                                        수업일 : 월 · 화 · 목 · 금요일
+                                    </div>
+                                </div>
+                                <div style={{marginTop:8,padding:'10px 20px',background:'#f8fafc',borderRadius:14,fontSize:13,fontWeight:700,color:'#94a3b8'}}>
+                                    {currentDay}요일
+                                </div>
+                            </div>
+                        )
                         ) : (
+                            /* ── 선택한 반의 학생 출결 체크 ── */
                             <div>
                                 <div className="sticky-bar">
                                     <button className="back-btn" onClick={() => setActiveClassId(null)}><Icon name="chevron-l" size={20}/></button>
-                                    <span className="sticky-title">{activeClass?.name}</span>
+                                    <div>
+                                        <div style={{fontSize:11,fontWeight:700,color:'#94a3b8',marginBottom:2}}>{activeClass?.grade}</div>
+                                        <div className="sticky-title" style={{display:'flex',alignItems:'center',gap:6}}>
+                                            {activeClass?.extra && <span style={{fontSize:10,fontWeight:900,padding:'1px 6px',borderRadius:6,background:'#6366f1',color:'#fff'}}>추가</span>}
+                                            {activeClass ? `${activeClass.days} ${(activeClass.id.endsWith('-s')||activeClass.id.endsWith('-xs'))?'수반':'학반'}` : ''}
+                                        </div>
+                                    </div>
                                     {syncing && <div className="sync-indicator"><span style={{width:12,height:12,border:'2px solid #fb923c',borderTopColor:'transparent',borderRadius:'50%',display:'inline-block',animation:'spin .8s linear infinite'}}/> 저장 중</div>}
                                 </div>
                                 {students.filter(s => s.ClassID === activeClassId).length === 0 ? (
