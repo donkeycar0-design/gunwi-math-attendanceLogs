@@ -301,6 +301,13 @@ const ReportView = ({ logs, students }) => {
     const [dateFrom,     setDateFrom]     = useState('');
     const [dateTo,       setDateTo]       = useState('');
 
+    const today = getKSTDate();
+
+    // 오늘 날짜 기준 통계
+    const todayLogs    = useMemo(() => logs.filter(l => normalizeDate(l.Date) === today), [logs, today]);
+    const todayPresent = useMemo(() => todayLogs.filter(l => l.Status === 'PRESENT').length, [todayLogs]);
+    const todayAbsent  = useMemo(() => todayLogs.filter(l => l.Status === 'ABSENT').length,  [todayLogs]);
+
     const filtered = useMemo(() => logs.filter(log => {
         const student = students.find(s => s.ID === log.StudentID);
         const cls     = student ? ALL_CLASSES.find(c => c.id === student.ClassID) : null;
@@ -317,12 +324,16 @@ const ReportView = ({ logs, students }) => {
 
     return (
         <div className="fade-in" style={{display:'flex',flexDirection:'column',gap:20,paddingBottom:40}}>
+            {/* 오늘 날짜 표시 */}
+            <div style={{fontSize:11,fontWeight:900,color:'#94a3b8',letterSpacing:'.1em'}}>
+                TODAY · {today} 기준
+            </div>
             <div className="grid-4">
                 {[
-                    {label:'전체 로그', val:logs.length,                                color:'#0f172a'},
-                    {label:'출석',      val:logs.filter(l=>l.Status==='PRESENT').length, color:'#059669'},
-                    {label:'결석',      val:logs.filter(l=>l.Status==='ABSENT').length,  color:'#dc2626'},
-                    {label:'등록 학생', val:students.length,                             color:'#4f46e5'},
+                    {label:'오늘 출결 로그', val:todayLogs.length,    color:'#0f172a'},
+                    {label:'오늘 출석',      val:todayPresent,         color:'#059669'},
+                    {label:'오늘 결석',      val:todayAbsent,          color:'#dc2626'},
+                    {label:'등록 학생',      val:students.length,      color:'#4f46e5'},
                 ].map(item => (
                     <div key={item.label} className="card stat-card">
                         <div className="stat-label">{item.label}</div>
