@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>군위몰입수학 출결관리</title>
+    <title>군위몰입수학 출결관리 v2</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="몰입수학">
@@ -225,8 +225,6 @@
 <script type="text/babel">
 const { useState, useMemo, useEffect, useCallback } = React;
 
-/* ━━━ ⚙️  배포 URL ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwJBnDd2A-siHlsbHcrVKiRuODyk33WV47Ep5wrpzCQwUTP0X-RGSYxzAUJzhQBd7z3rA/exec';
 
 const getKSTDate = (d = new Date()) =>
     new Date(d.getTime() + 9 * 3600 * 1000).toISOString().split('T')[0];
@@ -248,9 +246,79 @@ const normalizeDate = val => {
     return s;
 };
 
+// ✅ UTC 문자열 → KST 날짜(yyyy-MM-dd) 변환
+const toKSTDate = (utcStr) => {
+    if (!utcStr) return '';
+    const d = new Date(utcStr);
+    return new Date(d.getTime() + 9 * 3600 * 1000).toISOString().substring(0, 10);
+};
+
+// ━━━ ⚙️ Supabase 연결 설정 ━━━
+const SB_URL = 'https://uypqettuaytbcyfhngnq.supabase.co';
+const SB_KEY = 'sb_publishable_Q7otgfp69OfgIKzQAlRa_g_HDwcLDZc';
+
+const sbFetch = (path, opts={}) => fetch(`${SB_URL}/rest/v1/${path}`, {
+    ...opts,
+    headers: {
+        'Content-Type': 'application/json',
+        'apikey': SB_KEY,
+        'Authorization': `Bearer ${SB_KEY}`,
+        'Prefer': 'return=representation',
+        ...(opts.headers||{})
+    }
+}).then(r => r.json());
+
 const api = {
-    get:  action => fetch(`${SCRIPT_URL}?action=${action}`).then(r => r.json()),
-    post: body   => fetch(SCRIPT_URL, { method:'POST', body:JSON.stringify(body) }).then(r => r.json()),
+    get: async (action) => {
+        if (action === 'getStudents') {
+            const data = await sbFetch('students?select=*&order=name.asc');
+            return data.map(s => ({ ID:s.id, Name:s.name, ClassID:s.class_id, CreatedAt:s.created_at }));
+        }
+        if (action === 'getLogs') {
+            const data = await sbFetch('logs?select=*&order=updated_at.desc');
+            return data.map(l => ({ LogID:l.log_id, StudentID:l.student_id, Date:l.date, Status:l.status, UpdatedAt:l.updated_at }));
+        }
+        return [];
+    },
+    post: async (body) => {
+        const { action, ...payload } = body;
+        const uuid = () => crypto.randomUUID();
+        const now  = () => new Date().toISOString();
+
+        // ── 학생 추가 ──
+        if (action === 'addStudent') {
+            const id = uuid();
+            await sbFetch('students', { method:'POST', body: JSON.stringify({ id, name:payload.name, class_id:payload.classId, created_at:now() }) });
+            return { success:true, id };
+        }
+
+        // ── 학생 삭제 ──
+        if (action === 'deleteStudent') {
+            await sbFetch(`students?id=eq.${payload.id}`, { method:'DELETE' });
+            await sbFetch(`logs?student_id=eq.${payload.id}`, { method:'DELETE' });
+            return { success:true };
+        }
+
+        // ── 출결 체크 (중복 방지 upsert) ──
+        if (action === 'setAttendance') {
+            const logId  = `${payload.studentId}-${payload.date}`;
+            const kstNow = new Date(new Date().getTime() + 9*3600*1000).toISOString();
+            await sbFetch('logs', {
+                method: 'POST',
+                headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
+                body: JSON.stringify({
+                    log_id:     logId,
+                    student_id: payload.studentId,
+                    date:       payload.date,
+                    status:     payload.status,
+                    updated_at: kstNow
+                })
+            });
+            return { success:true };
+        }
+
+        return { success:true };
+    }
 };
 
 const PATHS = {
@@ -309,22 +377,29 @@ const ReportView = ({ logs, students }) => {
 
     const today = getKSTDate();
 
-    // ✅ 오늘 기준을 UpdatedAt(기록시각) 기준으로 변경
-    const todayLogs    = useMemo(() => logs.filter(l => {
-        if (!l.UpdatedAt) return false;
-        return normalizeDate(l.UpdatedAt) === today;
-    }), [logs, today]);
+    // ✅ 오늘 기준 — 실제 출결 날짜(Date) 기준
+    const todayLogs    = useMemo(() => logs.filter(l => l.Date && normalizeDate(l.Date) === today), [logs, today]);
     const todayPresent = useMemo(() => todayLogs.filter(l => l.Status === 'PRESENT').length, [todayLogs]);
     const todayAbsent  = useMemo(() => todayLogs.filter(l => l.Status === 'ABSENT').length,  [todayLogs]);
 
-    // ✅ 필터도 UpdatedAt 기준
+    // ✅ 최근 수업일 계산
+    const lastClassDate = useMemo(() => {
+        const dates = logs.map(l => normalizeDate(l.Date)).filter(d => d && d < today);
+        if (dates.length === 0) return null;
+        return dates.sort().reverse()[0];
+    }, [logs, today]);
+    const lastLogs    = useMemo(() => lastClassDate ? logs.filter(l => normalizeDate(l.Date) === lastClassDate) : [], [logs, lastClassDate]);
+    const lastPresent = useMemo(() => lastLogs.filter(l => l.Status === 'PRESENT').length, [lastLogs]);
+    const lastAbsent  = useMemo(() => lastLogs.filter(l => l.Status === 'ABSENT').length,  [lastLogs]);
+
+    // ✅ 필터 — Date 기준
     const filtered = useMemo(() => logs.filter(log => {
         const student = students.find(s => s.ID === log.StudentID);
         const cls     = student ? ALL_CLASSES.find(c => c.id === student.ClassID) : null;
         if (searchName.trim() && !(student?.Name||'').includes(searchName.trim())) return false;
         if (filterStatus !== 'ALL' && log.Status !== filterStatus) return false;
         if (filterGrade  !== 'ALL' && cls?.grade  !== filterGrade)  return false;
-        const logDate = log.UpdatedAt ? normalizeDate(log.UpdatedAt) : '';
+        const logDate = log.Date ? normalizeDate(log.Date) : '';
         if (dateFrom && logDate < dateFrom) return false;
         if (dateTo   && logDate > dateTo)   return false;
         return true;
@@ -335,22 +410,48 @@ const ReportView = ({ logs, students }) => {
 
     return (
         <div className="fade-in" style={{display:'flex',flexDirection:'column',gap:20,paddingBottom:40}}>
-            <div style={{fontSize:11,fontWeight:900,color:'#94a3b8',letterSpacing:'.1em'}}>
-                TODAY · {today} 기준
+
+            {/* ── 오늘 통계 ── */}
+            <div>
+                <div style={{fontSize:11,fontWeight:900,color:'#94a3b8',letterSpacing:'.1em',marginBottom:10}}>
+                    TODAY · {today}
+                </div>
+                <div className="grid-4">
+                    {[
+                        {label:'오늘 출결 로그', val:todayLogs.length, color:'#0f172a'},
+                        {label:'오늘 출석',      val:todayPresent,      color:'#059669'},
+                        {label:'오늘 결석',      val:todayAbsent,       color:'#dc2626'},
+                        {label:'등록 학생',      val:students.length,   color:'#4f46e5'},
+                    ].map(item => (
+                        <div key={item.label} className="card stat-card">
+                            <div className="stat-label">{item.label}</div>
+                            <div className="stat-val" style={{color:item.color}}>{item.val}</div>
+                        </div>
+                    ))}
+                </div>
             </div>
-            <div className="grid-4">
-                {[
-                    {label:'오늘 출결 로그', val:todayLogs.length,    color:'#0f172a'},
-                    {label:'오늘 출석',      val:todayPresent,         color:'#059669'},
-                    {label:'오늘 결석',      val:todayAbsent,          color:'#dc2626'},
-                    {label:'등록 학생',      val:students.length,      color:'#4f46e5'},
-                ].map(item => (
-                    <div key={item.label} className="card stat-card">
-                        <div className="stat-label">{item.label}</div>
-                        <div className="stat-val" style={{color:item.color}}>{item.val}</div>
+
+            {/* ── 최근 수업일 통계 ── */}
+            {lastClassDate && (
+                <div>
+                    <div style={{fontSize:11,fontWeight:900,color:'#f97316',letterSpacing:'.1em',marginBottom:10}}>
+                        최근 수업일 · {lastClassDate}
                     </div>
-                ))}
-            </div>
+                    <div className="grid-4">
+                        {[
+                            {label:'수업일 출결 로그', val:lastLogs.length, color:'#0f172a'},
+                            {label:'수업일 출석',      val:lastPresent,     color:'#059669'},
+                            {label:'수업일 결석',      val:lastAbsent,      color:'#dc2626'},
+                            {label:'등록 학생',        val:students.length, color:'#4f46e5'},
+                        ].map(item => (
+                            <div key={item.label} className="card stat-card" style={{borderTop:'3px solid #fb923c'}}>
+                                <div className="stat-label">{item.label}</div>
+                                <div className="stat-val" style={{color:item.color}}>{item.val}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             <div className="search-bar">
                 <div className="search-input-wrap">
@@ -383,11 +484,10 @@ const ReportView = ({ logs, students }) => {
             <div className="report-table-wrap">
                 <div className="report-table-scroll">
                     <table className="report-table">
-                        {/* ✅ 날짜 제거, 기록시각 맨 앞으로 */}
-                        <thead><tr>{['기록시각','학생명','반','상태'].map(h => <th key={h}>{h}</th>)}</tr></thead>
+                        <thead><tr>{['수업일','기록시각','학생명','반','상태'].map(h => <th key={h}>{h}</th>)}</tr></thead>
                         <tbody>
                             {filtered.length === 0
-                                ? <tr><td className="empty-cell" colSpan={4}>{hasFilter?'검색 조건에 맞는 기록이 없습니다':'출결 기록이 없습니다'}</td></tr>
+                                ? <tr><td className="empty-cell" colSpan={5}>{hasFilter?'검색 조건에 맞는 기록이 없습니다':'출결 기록이 없습니다'}</td></tr>
                                 : filtered.map(log => {
                                     const student = students.find(s => s.ID === log.StudentID);
                                     const cls     = student ? ALL_CLASSES.find(c => c.id === student.ClassID) : null;
@@ -397,6 +497,7 @@ const ReportView = ({ logs, students }) => {
                                         : null;
                                     return (
                                         <tr key={log.LogID}>
+                                            <td className="td-date" style={{fontWeight:900,color:'#1e293b'}}>{log.Date ? normalizeDate(log.Date) : '—'}</td>
                                             <td className="td-time">{log.UpdatedAt ? new Date(log.UpdatedAt).toLocaleString('ko-KR') : '—'}</td>
                                             <td className="td-name">{hi ? <span dangerouslySetInnerHTML={{__html:hi}}/> : name}</td>
                                             <td className="td-class">{cls?.name||'—'}</td>
@@ -551,13 +652,13 @@ const App = () => {
                     </button>
                     <div className="db-card">
                         <div className="db-card-label">Database</div>
-                        <div className="db-card-val">Google Sheets</div>
+                        <div className="db-card-val">Supabase Connected</div>
                         <div className="db-card-sub">학생 {students.length}명 · 로그 {logs.length}건</div>
                     </div>
                     <div style={{marginTop:12,paddingTop:12,borderTop:'1px solid #f1f5f9'}}>
                         <div style={{fontSize:9,fontWeight:900,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'.1em',marginBottom:4}}>제작</div>
                         <div style={{fontSize:12,fontWeight:900,color:'#64748b'}}>티치포퓨터</div>
-                        <div style={{fontSize:11,fontWeight:700,color:'#94a3b8',marginTop:2}}>바이브코딩 연구소</div>
+                        <div style={{fontSize:11,fontWeight:700,color:'#94a3b8',marginTop:2}}>코딩 연구소</div>
                     </div>
                 </div>
             </aside>
